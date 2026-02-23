@@ -4,10 +4,6 @@ import { Sidebar } from './components/Sidebar';
 import { WaveformCanvas } from './components/WaveformCanvas';
 import { StatusBar } from './components/StatusBar';
 import { useAppContext } from './hooks/useAppContext';
-import { useEffect } from 'react';
-import { coreRadixPlugin } from './plugins/coreRadixPlugin';
-import { coreFloatPlugin } from './plugins/coreFloatPlugin';
-
 function App() {
     const { state } = useAppContext();
 

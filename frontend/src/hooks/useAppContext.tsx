@@ -35,6 +35,9 @@ interface AppState {
     /** Selected signal indices to display in the waveform view */
     selectedSignals: number[];
 
+    /** Indices of signals currently visible in the virtual scroll window */
+    visibleRowIndices: number[];
+
     /** Viewport: the time range currently visible */
     viewStart: number;
     viewEnd: number;
@@ -51,6 +54,9 @@ interface AppState {
 
     /** Sidebar collapsed state */
     sidebarCollapsed: boolean;
+
+    /** Unflatten Chisel Signals mode */
+    unflattenChisel: boolean;
 
     /** Custom format overrides per signal index */
     signalFormats: Record<number, string>;
@@ -71,6 +77,7 @@ const initialState: AppState = {
     signals: [],
     hierarchy: null,
     selectedSignals: [],
+    visibleRowIndices: [],
     viewStart: 0,
     viewEnd: 100,
     timeBegin: 0,
@@ -78,6 +85,7 @@ const initialState: AppState = {
     queryResult: null,
     searchQuery: '',
     sidebarCollapsed: false,
+    unflattenChisel: false,
     signalFormats: {},
     formatPlugins: [coreRadixPlugin, coreFloatPlugin],
     activeSignalIndex: null,
@@ -97,12 +105,16 @@ type Action =
     }
     | { type: 'FILE_CLOSED' }
     | { type: 'TOGGLE_SIGNAL'; index: number }
+    | { type: 'ADD_SIGNALS'; indices: number[] }
+    | { type: 'REMOVE_SIGNALS'; indices: number[] }
     | { type: 'SELECT_SIGNALS'; indices: number[] }
+    | { type: 'SET_VISIBLE_ROWS'; indices: number[] }
     | { type: 'REMOVE_SIGNAL'; index: number }
     | { type: 'SET_VIEW'; start: number; end: number }
     | { type: 'SET_QUERY_RESULT'; result: QueryResult }
     | { type: 'SET_SEARCH'; query: string }
     | { type: 'TOGGLE_SIDEBAR' }
+    | { type: 'TOGGLE_UNFLATTEN_CHISEL' }
     | { type: 'MOVE_SIGNAL'; fromIdx: number; toIdx: number }
     | { type: 'SET_SIGNAL_FORMAT'; index: number; format: string }
     | { type: 'REGISTER_PLUGIN'; plugin: FormatPlugin }
@@ -127,6 +139,7 @@ function reducer(state: AppState, action: Action): AppState {
                 signals: action.signals,
                 hierarchy: action.hierarchy,
                 selectedSignals: [],
+                visibleRowIndices: [],
                 viewStart: tBegin,
                 viewEnd: tEnd,
                 timeBegin: tBegin,
@@ -151,8 +164,25 @@ function reducer(state: AppState, action: Action): AppState {
             return { ...state, selectedSignals: newSel };
         }
 
+        case 'ADD_SIGNALS': {
+            const currentSel = new Set(state.selectedSignals);
+            action.indices.forEach((idx) => currentSel.add(idx));
+            return { ...state, selectedSignals: Array.from(currentSel) };
+        }
+
+        case 'REMOVE_SIGNALS': {
+            const toRemove = new Set(action.indices);
+            return {
+                ...state,
+                selectedSignals: state.selectedSignals.filter((idx) => !toRemove.has(idx)),
+            };
+        }
+
         case 'SELECT_SIGNALS':
             return { ...state, selectedSignals: action.indices };
+
+        case 'SET_VISIBLE_ROWS':
+            return { ...state, visibleRowIndices: action.indices };
 
         case 'REMOVE_SIGNAL':
             return {
@@ -173,6 +203,9 @@ function reducer(state: AppState, action: Action): AppState {
 
         case 'TOGGLE_SIDEBAR':
             return { ...state, sidebarCollapsed: !state.sidebarCollapsed };
+
+        case 'TOGGLE_UNFLATTEN_CHISEL':
+            return { ...state, unflattenChisel: !state.unflattenChisel };
 
         case 'MOVE_SIGNAL': {
             const arr = [...state.selectedSignals];
@@ -215,6 +248,7 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAppContext(): AppContextValue {
     const ctx = useContext(AppContext);
     if (!ctx) throw new Error('useAppContext must be used within AppProvider');
@@ -230,7 +264,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Bind window.WaveformViewer globally so plugins can register themselves
     useEffect(() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).WaveformViewer = {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ...((window as any).WaveformViewer || {}),
             registerPlugin: (plugin: FormatPlugin) => {
                 dispatch({ type: 'REGISTER_PLUGIN', plugin });
@@ -252,11 +288,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
             );
     }, []);
 
-    // Query waveform data whenever view or selected signals change
+    // Query waveform data whenever view or visible signals change
     const doQuery = useCallback(() => {
         if (
             !vcdService.isFileLoaded ||
-            state.selectedSignals.length === 0
+            state.visibleRowIndices.length === 0
         )
             return;
 
@@ -264,13 +300,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const result = vcdService.query(
                 state.viewStart,
                 state.viewEnd,
-                state.selectedSignals
+                state.visibleRowIndices
             );
             dispatch({ type: 'SET_QUERY_RESULT', result });
         } catch (err) {
             console.error('Query failed:', err);
         }
-    }, [state.viewStart, state.viewEnd, state.selectedSignals]);
+    }, [state.viewStart, state.viewEnd, state.visibleRowIndices]);
 
     useEffect(() => {
         doQuery();

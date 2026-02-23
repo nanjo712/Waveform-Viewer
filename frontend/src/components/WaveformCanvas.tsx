@@ -103,11 +103,17 @@ export function WaveformCanvas() {
 
         const rect = container.getBoundingClientRect();
         const w = rect.width;
-        const totalRows = state.selectedSignals.length;
-        const h = Math.max(
-            rect.height,
-            HEADER_HEIGHT + TIMELINE_HEIGHT + totalRows * ROW_HEIGHT
-        );
+        const h = rect.height;
+
+        // Virtual scroll calculations
+        const scrollTop = container.scrollTop;
+        const startRow = Math.max(0, Math.floor((scrollTop - HEADER_HEIGHT - TIMELINE_HEIGHT) / ROW_HEIGHT));
+        const numVisibleRows = Math.ceil(h / ROW_HEIGHT) + 1;
+        const endRow = Math.min(state.selectedSignals.length, startRow + numVisibleRows);
+
+        // Update visible rows context so we only query what we see
+        const visibleIndices = state.selectedSignals.slice(startRow, endRow);
+        dispatch({ type: 'SET_VISIBLE_ROWS', indices: visibleIndices });
 
         canvas.width = w * DPR;
         canvas.height = h * DPR;
@@ -177,19 +183,25 @@ export function WaveformCanvas() {
 
         // ── Draw each signal waveform ─────────────────────────────
 
-        const waveAreaY = HEADER_HEIGHT + TIMELINE_HEIGHT;
+        // Draw visible waveforms
+        const drawVisibleRange = visibleIndices.map((sigIdx, relativeIndex) => {
+            const rowIdx = startRow + relativeIndex;
+            return { sigIdx, rowIdx };
+        });
 
-        state.selectedSignals.forEach((sigIdx, rowIdx) => {
+        drawVisibleRange.forEach(({ sigIdx, rowIdx }) => {
             const sig = state.signals[sigIdx];
             if (!sig) return;
 
-            const color = getSignalColor(rowIdx);
-            const y0 = waveAreaY + rowIdx * ROW_HEIGHT;
+            // Compute exact Y coordinates mapped from absolute document offset into sticky view
+            const absoluteRowTop = HEADER_HEIGHT + TIMELINE_HEIGHT + rowIdx * ROW_HEIGHT;
+            const y0 = absoluteRowTop - scrollTop;
+            if (y0 > h || y0 + ROW_HEIGHT < 0) return; // double check cull
+
             const rowTop = y0 + 4;
             const rowBot = y0 + ROW_HEIGHT - 4;
             const rowMid = (rowTop + rowBot) / 2;
-
-            // Row separator
+            const color = getSignalColor(rowIdx);
             ctx.strokeStyle = '#2a2d2e';
             ctx.beginPath();
             ctx.moveTo(0, y0 + ROW_HEIGHT + 0.5);
@@ -202,6 +214,7 @@ export function WaveformCanvas() {
             const isSingleBit = sig.width === 1;
 
             if (isSingleBit) {
+                // eslint-disable-next-line @typescript-eslint/no-use-before-define
                 drawSingleBitWaveform(
                     ctx,
                     result,
@@ -215,6 +228,7 @@ export function WaveformCanvas() {
                 );
             } else {
                 const formatId = state.signalFormats[sigIdx] || 'Hex';
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 let currentView: any = null;
                 for (const p of state.formatPlugins) {
                     for (const v of p.views) {
@@ -226,6 +240,7 @@ export function WaveformCanvas() {
                     if (currentView) break;
                 }
 
+                // eslint-disable-next-line @typescript-eslint/no-use-before-define
                 drawMultiBitWaveform(
                     ctx,
                     result,
@@ -241,7 +256,8 @@ export function WaveformCanvas() {
                 );
             }
         });
-    }, [state.selectedSignals, state.signals, state.signalFormats, state.viewStart, state.viewEnd, signalResultMap, unit]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [state.selectedSignals, state.signals, state.signalFormats, state.viewStart, state.viewEnd, signalResultMap, unit, dispatch]);
 
     // ── Single-bit waveform drawing ────────────────────────────────
 
@@ -351,6 +367,7 @@ export function WaveformCanvas() {
         ctx: CanvasRenderingContext2D,
         result: SignalQueryResult,
         width: number,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         formatView: any,
         timeToX: (t: number) => number,
         rowTop: number,
@@ -527,7 +544,9 @@ export function WaveformCanvas() {
         if (signalNamesRef.current && signalNamesRef.current.scrollTop !== e.currentTarget.scrollTop) {
             signalNamesRef.current.scrollTop = e.currentTarget.scrollTop;
         }
-    }, []);
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = requestAnimationFrame(draw);
+    }, [draw]);
 
     const handleNamesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
         if (containerRef.current && containerRef.current.scrollTop !== e.currentTarget.scrollTop) {
@@ -676,6 +695,23 @@ export function WaveformCanvas() {
         );
     }
 
+    const totalHeight = HEADER_HEIGHT + TIMELINE_HEIGHT + state.selectedSignals.length * ROW_HEIGHT;
+
+    // Names Virtualization
+    const namesContainer = signalNamesRef.current;
+    const currentNamesScroll = namesContainer?.scrollTop ?? 0;
+    const startRowNames = Math.max(0, Math.floor((currentNamesScroll - HEADER_HEIGHT - TIMELINE_HEIGHT) / ROW_HEIGHT));
+    const viewHeight = namesContainer?.clientHeight ?? 800; // fallback arbitrary
+    const numVisibleNames = Math.ceil(viewHeight / ROW_HEIGHT) + 1;
+    const endRowNames = Math.min(state.selectedSignals.length, startRowNames + numVisibleNames);
+
+    const visibleNamesData = state.selectedSignals.slice(startRowNames, endRowNames).map((sigIdx, i) => ({
+        sigIdx,
+        rowIdx: startRowNames + i,
+    }));
+
+    const paddingTop = startRowNames * ROW_HEIGHT;
+
     return (
         <div className="waveform-panel">
             <div className="waveform-toolbar">
@@ -723,7 +759,9 @@ export function WaveformCanvas() {
                         className="signal-names-header"
                         style={{ height: HEADER_HEIGHT + TIMELINE_HEIGHT }}
                     />
-                    {state.selectedSignals.map((sigIdx, rowIdx) => {
+                    {/* Top padding to substitute scrolled-out items */}
+                    <div style={{ height: paddingTop }} />
+                    {visibleNamesData.map(({ sigIdx, rowIdx }) => {
                         const sig = state.signals[sigIdx];
                         if (!sig) return null;
                         return (
@@ -756,6 +794,7 @@ export function WaveformCanvas() {
                             </div>
                         );
                     })}
+                    {/* Bottom padding to substitute unloaded items */}
                 </div>
 
                 {/* Waveform canvas */}
@@ -766,7 +805,9 @@ export function WaveformCanvas() {
                     onScroll={handleCanvasScroll}
                     style={{ cursor: 'grab' }}
                 >
-                    <canvas ref={canvasRef} />
+                    <div style={{ height: totalHeight, position: 'relative' }}>
+                        <canvas ref={canvasRef} style={{ display: 'block', position: 'sticky', top: 0, left: 0 }} />
+                    </div>
                 </div>
             </div>
         </div>
