@@ -1,3 +1,10 @@
 CompileFlags:
-    Add: -Wall
-    Remove: [-fmodules-ts,-fmodule-mapper=*, -fdeps-format=*]
+    Add: [
+        "-Wall",
+        "-target", "wasm32-unknown-emscripten",
+        "--sysroot=/home/woshiren/emsdk/upstream/emscripten/cache/sysroot"
+    ]
+    Remove: [-fmodules-ts, -fmodule-mapper=*, -fdeps-format=*]
+
+Index:
+    Background: Build

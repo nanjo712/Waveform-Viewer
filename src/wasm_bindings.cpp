@@ -3,13 +3,15 @@
 
 #include <cstdlib>
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include "vcd_parser.h"
 
 using namespace emscripten;
+using json = nlohmann::json;
 
 // ============================================================================
 // WASM wrapper: owns a VcdParser + a copy of the file buffer in WASM heap
@@ -104,24 +106,23 @@ class VcdParserWasm {
 
     std::string getSignalsJSON() const {
         auto& sigs = parser_.signals();
-        std::ostringstream os;
-        os << '[';
-        for (size_t i = 0; i < sigs.size(); ++i) {
-            if (i > 0) os << ',';
-            auto& s = sigs[i];
-            os << "{\"name\":\"" << escapeJSON(s.name)
-               << "\",\"fullPath\":\"" << escapeJSON(s.full_path)
-               << "\",\"idCode\":\"" << escapeJSON(s.id_code)
-               << "\",\"width\":" << s.width
-               << ",\"index\":" << s.index
-               << ",\"type\":\"" << varTypeStr(s.type) << '"';
+        json arr = json::array();
+        for (auto& s : sigs) {
+            json obj = {
+                {"name", s.name},
+                {"fullPath", s.full_path},
+                {"idCode", s.id_code},
+                {"width", s.width},
+                {"index", s.index},
+                {"type", varTypeStr(s.type)},
+            };
             if (s.msb >= 0) {
-                os << ",\"msb\":" << s.msb << ",\"lsb\":" << s.lsb;
+                obj["msb"] = s.msb;
+                obj["lsb"] = s.lsb;
             }
-            os << '}';
+            arr.push_back(std::move(obj));
         }
-        os << ']';
-        return os.str();
+        return arr.dump();
     }
 
     // --- Hierarchy as JSON ---
@@ -130,9 +131,7 @@ class VcdParserWasm {
     std::string getHierarchyJSON() const {
         auto* root = parser_.root_scope();
         if (!root) return "{}";
-        std::ostringstream os;
-        serializeScope(os, root);
-        return os.str();
+        return serializeScope(root).dump();
     }
 
     // --- Query ---
@@ -142,69 +141,25 @@ class VcdParserWasm {
 
     std::string query(double t_begin, double t_end,
                       const std::string& indicesJSON) const {
-        // Parse indicesJSON: "[0,2,5]"
-        std::vector<uint32_t> indices;
-        parseIndicesJSON(indicesJSON, indices);
+        auto parsed = json::parse(indicesJSON);
+        std::vector<uint32_t> indices = parsed.get<std::vector<uint32_t>>();
 
         auto result = parser_.query(static_cast<uint64_t>(t_begin),
                                      static_cast<uint64_t>(t_end), indices);
 
-        std::ostringstream os;
-        os << "{\"tBegin\":" << result.t_begin
-           << ",\"tEnd\":" << result.t_end
-           << ",\"signals\":[";
-
-        for (size_t i = 0; i < result.signals.size(); ++i) {
-            if (i > 0) os << ',';
-            auto& sqr = result.signals[i];
-            os << "{\"index\":" << sqr.signal_index
-               << ",\"name\":\"" << escapeJSON(sqr.signal_name)
-               << "\",\"initialValue\":\"" << escapeJSON(sqr.initial_value)
-               << "\",\"transitions\":[";
-
-            for (size_t j = 0; j < sqr.transitions.size(); ++j) {
-                if (j > 0) os << ',';
-                os << '[' << sqr.transitions[j].first
-                   << ",\"" << escapeJSON(sqr.transitions[j].second) << "\"]";
-            }
-            os << "]}";
-        }
-        os << "]}";
-        return os.str();
+        return serializeQueryResult(result).dump();
     }
 
     /// Convenience: query by signal paths
     std::string queryByPaths(double t_begin, double t_end,
                              const std::string& pathsJSON) const {
-        // Parse pathsJSON: '["top.clk","top.cpu.data"]'
-        std::vector<std::string> paths;
-        parsePathsJSON(pathsJSON, paths);
+        auto parsed = json::parse(pathsJSON);
+        std::vector<std::string> paths = parsed.get<std::vector<std::string>>();
 
         auto result = parser_.query(static_cast<uint64_t>(t_begin),
                                      static_cast<uint64_t>(t_end), paths);
 
-        std::ostringstream os;
-        os << "{\"tBegin\":" << result.t_begin
-           << ",\"tEnd\":" << result.t_end
-           << ",\"signals\":[";
-
-        for (size_t i = 0; i < result.signals.size(); ++i) {
-            if (i > 0) os << ',';
-            auto& sqr = result.signals[i];
-            os << "{\"index\":" << sqr.signal_index
-               << ",\"name\":\"" << escapeJSON(sqr.signal_name)
-               << "\",\"initialValue\":\"" << escapeJSON(sqr.initial_value)
-               << "\",\"transitions\":[";
-
-            for (size_t j = 0; j < sqr.transitions.size(); ++j) {
-                if (j > 0) os << ',';
-                os << '[' << sqr.transitions[j].first
-                   << ",\"" << escapeJSON(sqr.transitions[j].second) << "\"]";
-            }
-            os << "]}";
-        }
-        os << "]}";
-        return os.str();
+        return serializeQueryResult(result).dump();
     }
 
     /// Find signal index by full path. Returns -1 if not found.
@@ -219,34 +174,7 @@ class VcdParserWasm {
     char* buf_ = nullptr;
     size_t buf_size_ = 0;
 
-    // --- JSON helpers ---
-
-    static std::string escapeJSON(const std::string& s) {
-        std::string out;
-        out.reserve(s.size());
-        for (char c : s) {
-            switch (c) {
-                case '"':
-                    out += "\\\"";
-                    break;
-                case '\\':
-                    out += "\\\\";
-                    break;
-                case '\n':
-                    out += "\\n";
-                    break;
-                case '\r':
-                    out += "\\r";
-                    break;
-                case '\t':
-                    out += "\\t";
-                    break;
-                default:
-                    out += c;
-            }
-        }
-        return out;
-    }
+    // --- Helpers ---
 
     static const char* varTypeStr(vcd::VarType t) {
         switch (t) {
@@ -287,71 +215,47 @@ class VcdParserWasm {
         }
     }
 
-    static void serializeScope(std::ostringstream& os,
-                                const vcd::ScopeNode* node) {
-        os << "{\"name\":\"" << escapeJSON(node->name)
-           << "\",\"fullPath\":\"" << escapeJSON(node->full_path) << '"';
+    static json serializeScope(const vcd::ScopeNode* node) {
+        json obj = {
+            {"name", node->name},
+            {"fullPath", node->full_path},
+        };
 
         if (!node->signal_indices.empty()) {
-            os << ",\"signals\":[";
-            for (size_t i = 0; i < node->signal_indices.size(); ++i) {
-                if (i > 0) os << ',';
-                os << node->signal_indices[i];
-            }
-            os << ']';
+            obj["signals"] = node->signal_indices;
         }
 
         if (!node->children.empty()) {
-            os << ",\"children\":[";
-            for (size_t i = 0; i < node->children.size(); ++i) {
-                if (i > 0) os << ',';
-                serializeScope(os, node->children[i].get());
+            json children = json::array();
+            for (auto& child : node->children) {
+                children.push_back(serializeScope(child.get()));
             }
-            os << ']';
+            obj["children"] = std::move(children);
         }
 
-        os << '}';
+        return obj;
     }
 
-    static void parseIndicesJSON(const std::string& json,
-                                  std::vector<uint32_t>& out) {
-        // Simple parser for "[1,2,3]"
-        size_t i = 0;
-        while (i < json.size()) {
-            if (json[i] >= '0' && json[i] <= '9') {
-                uint32_t val = 0;
-                while (i < json.size() && json[i] >= '0' && json[i] <= '9') {
-                    val = val * 10 + (json[i] - '0');
-                    ++i;
-                }
-                out.push_back(val);
-            } else {
-                ++i;
+    static json serializeQueryResult(const vcd::QueryResult& result) {
+        json signals_arr = json::array();
+        for (auto& sqr : result.signals) {
+            json transitions_arr = json::array();
+            for (auto& [ts, val] : sqr.transitions) {
+                transitions_arr.push_back(json::array({ts, val}));
             }
+            signals_arr.push_back({
+                {"index", sqr.signal_index},
+                {"name", sqr.signal_name},
+                {"initialValue", sqr.initial_value},
+                {"transitions", std::move(transitions_arr)},
+            });
         }
-    }
 
-    static void parsePathsJSON(const std::string& json,
-                                std::vector<std::string>& out) {
-        // Simple parser for '["a.b","c.d"]'
-        size_t i = 0;
-        while (i < json.size()) {
-            if (json[i] == '"') {
-                ++i;
-                std::string s;
-                while (i < json.size() && json[i] != '"') {
-                    if (json[i] == '\\' && i + 1 < json.size()) {
-                        ++i;
-                    }
-                    s += json[i];
-                    ++i;
-                }
-                if (i < json.size()) ++i;  // skip closing "
-                out.push_back(std::move(s));
-            } else {
-                ++i;
-            }
-        }
+        return {
+            {"tBegin", result.t_begin},
+            {"tEnd", result.t_end},
+            {"signals", std::move(signals_arr)},
+        };
     }
 };
 
