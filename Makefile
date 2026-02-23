@@ -19,6 +19,14 @@ WASM_OUT    := wasm
 FRONTEND    := frontend
 PUBLIC_WASM := $(FRONTEND)/public/wasm
 
+ifeq ($(OS),Windows_NT)
+    EMCMAKE := emcmake.bat
+    EMMAKE  := emmake.bat
+else
+    EMCMAKE := emcmake
+    EMMAKE  := emmake
+endif
+
 .PHONY: all wasm frontend dev start build static serve clean help
 
 help:
@@ -39,13 +47,13 @@ $(BUILD_DIR)/Makefile:
 	@$(EMSDK_ENV) && \
 		mkdir -p $(BUILD_DIR) && \
 		cd $(BUILD_DIR) && \
-		emcmake cmake .. -DCMAKE_BUILD_TYPE=Release
+		$(EMCMAKE) cmake .. -DCMAKE_BUILD_TYPE=Release
 
 wasm: $(BUILD_DIR)/Makefile
 	@echo ">>> Building WASM module..."
 	@$(EMSDK_ENV) && \
 		cd $(BUILD_DIR) && \
-		emmake make -j$$(nproc) 2>&1
+		$(EMMAKE) make -j$$(nproc) 2>&1
 	@echo ">>> Copying WASM artifacts to $(PUBLIC_WASM)/"
 	@mkdir -p $(PUBLIC_WASM)
 	@cp $(WASM_OUT)/vcd_parser.js  $(PUBLIC_WASM)/
