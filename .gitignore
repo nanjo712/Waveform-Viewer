@@ -6,3 +6,5 @@ frontend/node_modules
 frontend/dist
 frontend/public/wasm/vcd_parser.js
 frontend/public/wasm/vcd_parser.wasm
+wasm/vcd_parser.js
+wasm/vcd_parser.wasm
