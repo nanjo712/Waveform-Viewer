@@ -487,7 +487,8 @@ export function WaveformCanvas() {
         });
         obs.observe(container);
         return () => obs.disconnect();
-    }, [draw]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draw, state.selectedSignals.length]);
 
     // ── Redraw on state change ─────────────────────────────────────
 
@@ -545,7 +546,8 @@ export function WaveformCanvas() {
         if (!el) return;
         el.addEventListener('wheel', handleWheel, { passive: false });
         return () => el.removeEventListener('wheel', handleWheel);
-    }, [handleWheel]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [handleWheel, state.selectedSignals.length]);
 
     // ── Synchronized vertical scrolling ────────────────────────────
 
