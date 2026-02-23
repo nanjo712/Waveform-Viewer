@@ -6,6 +6,7 @@ import {
 } from 'react';
 import { useAppContext } from '../hooks/useAppContext';
 import type { SignalQueryResult } from '../types/vcd';
+import { formatSignalValue } from '../utils/format';
 
 // ── Color palette for signals ──────────────────────────────────────
 
@@ -34,30 +35,6 @@ function parseBitValue(val: string): number | null {
     if (val === 'x' || val === 'X') return -1; // unknown
     if (val === 'z' || val === 'Z') return -2; // high-z
     return null;
-}
-
-function parseMultiBitValue(val: string): {
-    numeric: number | null;
-    display: string;
-    isX: boolean;
-    isZ: boolean;
-} {
-    let raw = val;
-    if (raw.startsWith('b') || raw.startsWith('B')) raw = raw.slice(1);
-    if (raw.startsWith('r') || raw.startsWith('R')) {
-        const n = parseFloat(raw.slice(1));
-        return { numeric: n, display: n.toString(), isX: false, isZ: false };
-    }
-
-    const isX = raw.includes('x') || raw.includes('X');
-    const isZ = raw.includes('z') || raw.includes('Z');
-
-    if (isX) return { numeric: null, display: 'X', isX: true, isZ: false };
-    if (isZ) return { numeric: null, display: 'Z', isX: false, isZ: true };
-
-    const n = parseInt(raw, 2);
-    const hex = '0x' + n.toString(16).toUpperCase();
-    return { numeric: n, display: hex, isX: false, isZ: false };
 }
 
 // ── Time axis formatting ───────────────────────────────────────────
@@ -237,9 +214,12 @@ export function WaveformCanvas() {
                     viewEnd
                 );
             } else {
+                const format = state.signalFormats[sigIdx] || 'Hex';
                 drawMultiBitWaveform(
                     ctx,
                     result,
+                    sig.width,
+                    format,
                     timeToX,
                     rowTop,
                     rowBot,
@@ -250,7 +230,7 @@ export function WaveformCanvas() {
                 );
             }
         });
-    }, [state.selectedSignals, state.signals, state.viewStart, state.viewEnd, signalResultMap, unit]);
+    }, [state.selectedSignals, state.signals, state.signalFormats, state.viewStart, state.viewEnd, signalResultMap, unit]);
 
     // ── Single-bit waveform drawing ────────────────────────────────
 
@@ -359,6 +339,8 @@ export function WaveformCanvas() {
     function drawMultiBitWaveform(
         ctx: CanvasRenderingContext2D,
         result: SignalQueryResult,
+        width: number,
+        format: string,
         timeToX: (t: number) => number,
         rowTop: number,
         rowBot: number,
@@ -394,7 +376,7 @@ export function WaveformCanvas() {
             const toX = Math.min(seg.to, canvasWidth + slant);
             if (fromX >= toX) continue;
 
-            const parsed = parseMultiBitValue(seg.val);
+            const parsed = formatSignalValue(seg.val, width, format);
 
             if (parsed.isX) {
                 ctx.fillStyle = 'rgba(244, 71, 71, 0.15)';
@@ -701,6 +683,23 @@ export function WaveformCanvas() {
                                     {sig.name}
                                     {sig.width > 1 && ` [${sig.msb ?? sig.width - 1}:${sig.lsb ?? 0}]`}
                                 </span>
+                                {sig.width > 1 && (
+                                    <select
+                                        className="signal-format"
+                                        value={state.signalFormats[sigIdx] || 'Hex'}
+                                        onChange={(e) => dispatch({ type: 'SET_SIGNAL_FORMAT', index: sigIdx, format: e.target.value })}
+                                        title="Format"
+                                    >
+                                        <option value="Bin">Bin</option>
+                                        <option value="Oct">Oct</option>
+                                        <option value="Dec">Dec</option>
+                                        <option value="Hex">Hex</option>
+                                        <option value="FP16">FP16</option>
+                                        <option value="FP32">FP32</option>
+                                        <option value="FP64">FP64</option>
+                                        <option value="ASCII">ASCII</option>
+                                    </select>
+                                )}
                                 <button
                                     className="signal-remove"
                                     onClick={() =>

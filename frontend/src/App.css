@@ -496,6 +496,32 @@ body,
   color: var(--text-error);
 }
 
+.signal-format {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  padding: 0 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.signal-format:hover {
+  border-color: var(--border-color);
+  background: var(--bg-hover);
+}
+
+.signal-format:focus {
+  border-color: var(--accent);
+}
+
+.signal-format option {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
 .signal-name-text {
   flex: 1;
   overflow: hidden;
