@@ -7,6 +7,8 @@
 #   make dev        - Start Vite dev server (development)
 #   make start      - Build WASM + start dev server
 #   make build      - Full production build (WASM + frontend)
+#   make static     - Create a portable static build in ./dist
+#   make serve      - Serve the static build in ./dist using a local server
 #   make clean      - Remove all build artifacts
 # ============================================================================
 
@@ -17,7 +19,7 @@ WASM_OUT    := wasm
 FRONTEND    := frontend
 PUBLIC_WASM := $(FRONTEND)/public/wasm
 
-.PHONY: all wasm frontend dev start build clean help
+.PHONY: all wasm frontend dev start build static serve clean help
 
 help:
 	@echo "Usage:"
@@ -26,6 +28,8 @@ help:
 	@echo "  make dev        Start Vite dev server (with WASM)"
 	@echo "  make start      Build WASM, then start dev server"
 	@echo "  make build      Full production build (WASM + frontend)"
+	@echo "  make static     Create a portable static build in ./dist"
+	@echo "  make serve      Serve the static build in ./dist"
 	@echo "  make clean      Remove all build artifacts"
 
 # ── WASM build ──────────────────────────────────────────────────────
@@ -72,11 +76,31 @@ start: wasm dev
 
 build: wasm frontend
 
+static: build
+	@echo ">>> Creating portable static package..."
+	@rm -rf dist
+	@cp -r $(FRONTEND)/dist dist
+	@echo ">>> Static build ready in ./dist/"
+
+serve:
+	@echo ">>> Serving static build on http://localhost:8080 ..."
+	@if command -v npx > /dev/null; then \
+		npx serve -l 8080 dist; \
+	elif command -v python3 > /dev/null; then \
+		cd dist && python3 -m http.server 8080; \
+	elif command -v python > /dev/null; then \
+		cd dist && python -m SimpleHTTPServer 8080; \
+	else \
+		echo "Error: No suitable server found (npx, python3, or python)."; \
+		exit 1; \
+	fi
+
 # ── Clean ───────────────────────────────────────────────────────────
 
 clean:
 	@echo ">>> Cleaning build artifacts..."
 	rm -rf $(BUILD_DIR)
 	rm -rf $(FRONTEND)/dist
+	rm -rf dist
 	rm -f  $(PUBLIC_WASM)/vcd_parser.js $(PUBLIC_WASM)/vcd_parser.wasm
 	@echo ">>> Clean complete."
