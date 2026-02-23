@@ -13,43 +13,81 @@ export function unflattenChisel(node: ScopeNode, signals: SignalDef[]): ScopeNod
         return clone;
     }
 
+    type TrieNode = {
+        name: string;
+        children: Map<string, TrieNode>;
+        sigIndices: number[];
+        leafCount: number;
+    };
+
+    const root: TrieNode = { name: '', children: new Map(), sigIndices: [], leafCount: 0 };
+
     for (const idx of node.signals) {
         const sig = signals[idx];
         if (!sig) continue;
 
-        if (sig.name.includes('_')) {
-            const parts = sig.name.split('_');
-            const leafName = parts.pop()!;
+        const parts = sig.name.split('_');
+        let current = root;
+        current.leafCount++;
 
-            let currentPathStr = node.fullPath;
-            let parentScopeNode: ScopeNode = clone;
-
-            for (let i = 0; i < parts.length; i++) {
-                const part = parts[i];
-                currentPathStr += '.' + part;
-
-                let childScope = parentScopeNode.children?.find(c => c.name === part);
-                if (!childScope) {
-                    childScope = {
-                        name: part,
-                        fullPath: currentPathStr,
-                        children: [],
-                        uiSignals: [],
-                        signals: [],
-                    };
-                    if (!parentScopeNode.children) parentScopeNode.children = [];
-                    parentScopeNode.children.push(childScope);
-                }
-                parentScopeNode = childScope;
+        for (const part of parts) {
+            if (!current.children.has(part)) {
+                current.children.set(part, { name: part, children: new Map(), sigIndices: [], leafCount: 0 });
             }
+            current = current.children.get(part)!;
+            current.leafCount++;
+        }
+        current.sigIndices.push(idx);
+    }
 
-            if (!parentScopeNode.uiSignals) parentScopeNode.uiSignals = [];
-            parentScopeNode.uiSignals.push({ index: idx, name: leafName });
-        } else {
-            if (!clone.uiSignals) clone.uiSignals = [];
-            clone.uiSignals.push({ index: idx, name: sig.name });
+    function traverseTrie(trieNode: TrieNode, currentScope: ScopeNode) {
+        for (const [part, childNode] of trieNode.children.entries()) {
+            if (childNode.leafCount === 1) {
+                let leaf = childNode;
+                const remainingParts = [part];
+                while (leaf.children.size > 0) {
+                    const nextPart = Array.from(leaf.children.keys())[0];
+                    leaf = leaf.children.get(nextPart)!;
+                    remainingParts.push(nextPart);
+                }
+                if (!currentScope.uiSignals) currentScope.uiSignals = [];
+                currentScope.uiSignals.push({
+                    index: leaf.sigIndices[0],
+                    name: remainingParts.join('_')
+                });
+            } else {
+                let childScope: ScopeNode | undefined = undefined;
+                if (childNode.children.size > 0) {
+                    childScope = currentScope.children?.find(c => c.name === part);
+                    if (!childScope) {
+                        childScope = {
+                            name: part,
+                            fullPath: currentScope.fullPath ? currentScope.fullPath + '.' + part : part,
+                            children: [],
+                            uiSignals: [],
+                            signals: []
+                        };
+                        if (!currentScope.children) currentScope.children = [];
+                        currentScope.children.push(childScope);
+                    }
+                }
+
+                for (const idx of childNode.sigIndices) {
+                    if (!currentScope.uiSignals) currentScope.uiSignals = [];
+                    currentScope.uiSignals.push({
+                        index: idx,
+                        name: part
+                    });
+                }
+
+                if (childScope) {
+                    traverseTrie(childNode, childScope);
+                }
+            }
         }
     }
+
+    traverseTrie(root, clone);
 
     // Sort synthetic children and signals if any
     if (clone.children) {

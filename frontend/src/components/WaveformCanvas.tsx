@@ -183,6 +183,11 @@ export function WaveformCanvas() {
 
         // ── Draw each signal waveform ─────────────────────────────
 
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, timelineY + TIMELINE_HEIGHT, w, h - (timelineY + TIMELINE_HEIGHT));
+        ctx.clip();
+
         // Draw visible waveforms
         const drawVisibleRange = visibleIndices.map((sigIdx, relativeIndex) => {
             const rowIdx = startRow + relativeIndex;
@@ -256,6 +261,8 @@ export function WaveformCanvas() {
                 );
             }
         });
+
+        ctx.restore();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [state.selectedSignals, state.signals, state.signalFormats, state.viewStart, state.viewEnd, signalResultMap, unit, dispatch]);
 
