@@ -38,7 +38,7 @@
                 "compression": "lzma",
                 "languages": [
                     "English",
-                    "ChineseSimplified"
+                    "SimpChinese"
                 ]
             }
         }
