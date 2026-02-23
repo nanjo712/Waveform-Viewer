@@ -105,11 +105,13 @@ export function WaveformCanvas() {
         const w = rect.width;
         const h = rect.height;
 
-        // Virtual scroll calculations
+        // Virtual scroll calculations with 3x buffer (1x above + 1x visible + 1x below)
         const scrollTop = container.scrollTop;
-        const startRow = Math.max(0, Math.floor((scrollTop - HEADER_HEIGHT - TIMELINE_HEIGHT) / ROW_HEIGHT));
         const numVisibleRows = Math.ceil(h / ROW_HEIGHT) + 1;
-        const endRow = Math.min(state.selectedSignals.length, startRow + numVisibleRows);
+        const bufferRows = numVisibleRows; // 1x buffer
+        const rawStart = Math.floor((scrollTop - HEADER_HEIGHT - TIMELINE_HEIGHT) / ROW_HEIGHT);
+        const startRow = Math.max(0, rawStart - bufferRows);
+        const endRow = Math.min(state.selectedSignals.length, rawStart + numVisibleRows + bufferRows);
 
         // Update visible rows context so we only query what we see
         const visibleIndices = state.selectedSignals.slice(startRow, endRow);
@@ -704,13 +706,15 @@ export function WaveformCanvas() {
 
     const totalHeight = HEADER_HEIGHT + TIMELINE_HEIGHT + state.selectedSignals.length * ROW_HEIGHT;
 
-    // Names Virtualization
+    // Names Virtualization with 3x buffer
     const namesContainer = signalNamesRef.current;
     const currentNamesScroll = namesContainer?.scrollTop ?? 0;
-    const startRowNames = Math.max(0, Math.floor((currentNamesScroll - HEADER_HEIGHT - TIMELINE_HEIGHT) / ROW_HEIGHT));
-    const viewHeight = namesContainer?.clientHeight ?? 800; // fallback arbitrary
+    const viewHeight = namesContainer?.clientHeight ?? 800;
     const numVisibleNames = Math.ceil(viewHeight / ROW_HEIGHT) + 1;
-    const endRowNames = Math.min(state.selectedSignals.length, startRowNames + numVisibleNames);
+    const bufferNames = numVisibleNames; // 1x buffer
+    const rawStartNames = Math.floor((currentNamesScroll - HEADER_HEIGHT - TIMELINE_HEIGHT) / ROW_HEIGHT);
+    const startRowNames = Math.max(0, rawStartNames - bufferNames);
+    const endRowNames = Math.min(state.selectedSignals.length, rawStartNames + numVisibleNames + bufferNames);
 
     const visibleNamesData = state.selectedSignals.slice(startRowNames, endRowNames).map((sigIdx, i) => ({
         sigIdx,
