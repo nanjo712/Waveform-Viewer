@@ -143,7 +143,7 @@ export function WaveformCanvas() {
 
         ctx.strokeStyle = '#2a2d2e';
         ctx.lineWidth = 1;
-        ctx.font = '10px monospace';
+        ctx.font = '14px "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace';
         ctx.fillStyle = '#9d9d9d';
         ctx.textAlign = 'center';
 
@@ -432,7 +432,7 @@ export function WaveformCanvas() {
             const segWidth = toX - fromX;
             if (segWidth > 30) {
                 ctx.fillStyle = color;
-                ctx.font = '10px monospace';
+                ctx.font = '14px "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 const textX = (fromX + toX) / 2;
