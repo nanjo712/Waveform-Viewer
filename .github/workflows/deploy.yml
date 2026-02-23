@@ -27,18 +27,13 @@ jobs:
           cache-dependency-path: frontend/package.json
 
       - name: Build WASM
-        run: |
-          # 覆盖 Makefile 中的 EMSDK_ENV 变量，因为 setup-emsdk 已经设置好了环境
-          make wasm EMSDK_ENV="true"
+        run: make wasm
 
       - name: Build Frontend
-        run: |
-          make frontend
+        run: make frontend
 
       - name: Create Static Package
-          # 确保 dist 目录包含所有内容
-        run: |
-          make static
+        run: make static
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4

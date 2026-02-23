@@ -13,7 +13,7 @@
 # ============================================================================
 
 SHELL       := /bin/bash
-EMSDK_ENV   := source ~/emsdk/emsdk_env.sh 2>/dev/null
+EMSDK_ENV   := source ~/emsdk/emsdk_env.sh 2>/dev/null || true
 BUILD_DIR   := build-wasm
 WASM_OUT    := wasm
 FRONTEND    := frontend
