@@ -2,3 +2,7 @@ build*
 *.vcd
 .vscode
 .cache
+frontend/node_modules
+frontend/dist
+frontend/public/wasm/vcd_parser.js
+frontend/public/wasm/vcd_parser.wasm

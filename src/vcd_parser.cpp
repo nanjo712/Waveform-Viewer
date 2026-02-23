@@ -148,7 +148,7 @@ namespace vcd
 
         // --- Signal definitions ---
         std::vector<SignalDef> signal_defs;
-        std::unordered_map<std::string, uint32_t> id_to_index;
+        std::unordered_map<std::string, std::vector<uint32_t>> id_to_index;
         std::unordered_map<std::string, uint32_t> path_to_index;
 
         // --- Hierarchy ---
@@ -446,7 +446,7 @@ namespace vcd
             sig.index = static_cast<uint32_t>(signal_defs.size());
 
             cur_scope->signal_indices.push_back(sig.index);
-            id_to_index[sig.id_code] = sig.index;
+            id_to_index[sig.id_code].push_back(sig.index);
             path_to_index[sig.full_path] = sig.index;
             signal_defs.push_back(std::move(sig));
         }
@@ -489,10 +489,11 @@ namespace vcd
 
         // ================================================================
         // Value-change line parsing (single line, no timestamp)
-        // Returns signal index or UINT32_MAX
+        // Returns pointer to vector of aliased signal indices, or nullptr
         // ================================================================
 
-        uint32_t apply_value_change(Scanner& sc, std::vector<std::string>* vals)
+        const std::vector<uint32_t>* apply_value_change(
+            Scanner& sc, std::vector<std::string>* vals)
         {
             char c = *sc.pos();
 
@@ -503,8 +504,13 @@ namespace vcd
                 auto it = id_to_index.find(std::string(id_tok));
                 if (it != id_to_index.end())
                 {
-                    if (vals) (*vals)[it->second] = std::string(val_tok);
-                    return it->second;
+                    if (vals)
+                    {
+                        std::string v(val_tok);
+                        for (uint32_t idx : it->second)
+                            (*vals)[idx] = v;
+                    }
+                    return &it->second;
                 }
             }
             else if (c == '0' || c == '1' || c == 'x' || c == 'X' || c == 'z' ||
@@ -517,8 +523,13 @@ namespace vcd
                     auto it = id_to_index.find(id);
                     if (it != id_to_index.end())
                     {
-                        if (vals) (*vals)[it->second] = std::string(1, tok[0]);
-                        return it->second;
+                        if (vals)
+                        {
+                            std::string v(1, tok[0]);
+                            for (uint32_t idx : it->second)
+                                (*vals)[idx] = v;
+                        }
+                        return &it->second;
                     }
                 }
             }
@@ -526,7 +537,7 @@ namespace vcd
             {
                 sc.skip_line();
             }
-            return UINT32_MAX;
+            return nullptr;
         }
 
         // ================================================================
@@ -605,13 +616,15 @@ namespace vcd
                             }
                             size_t off = sc.offset(base);
                             const char* ls = sc.pos();
-                            uint32_t idx = apply_value_change(sc, &cur_vals);
-                            if (idx != UINT32_MAX)
+                            auto* indices =
+                                apply_value_change(sc, &cur_vals);
+                            if (indices)
                             {
                                 uint16_t len =
                                     static_cast<uint16_t>(sc.pos() - ls);
-                                sig_transitions[idx].transitions.push_back(
-                                    {cur_time, off, len});
+                                for (uint32_t idx : *indices)
+                                    sig_transitions[idx].transitions.push_back(
+                                        {cur_time, off, len});
                             }
                         }
                     }
@@ -633,12 +646,30 @@ namespace vcd
                     // Value-change line
                     size_t off = sc.offset(base);
                     const char* ls = sc.pos();
-                    uint32_t idx = apply_value_change(sc, &cur_vals);
-                    if (idx != UINT32_MAX)
+                    auto* indices = apply_value_change(sc, &cur_vals);
+                    if (indices)
                     {
                         uint16_t len = static_cast<uint16_t>(sc.pos() - ls);
-                        sig_transitions[idx].transitions.push_back(
-                            {cur_time, off, len});
+                        for (uint32_t idx : *indices)
+                            sig_transitions[idx].transitions.push_back(
+                                {cur_time, off, len});
+                    }
+                }
+            }
+
+            // If first timestamp > 0, fix any transitions that were recorded
+            // at time 0 (from $dump* blocks before the first #timestamp).
+            // These should be attributed to t_begin, not time 0.
+            if (t_begin > 0)
+            {
+                for (auto& st : sig_transitions)
+                {
+                    for (auto& tr : st.transitions)
+                    {
+                        if (tr.timestamp < t_begin)
+                            tr.timestamp = t_begin;
+                        else
+                            break;  // transitions are in order
                     }
                 }
             }
@@ -853,7 +884,9 @@ namespace vcd
     uint32_t VcdParser::find_signal_by_id(const std::string& id_code) const
     {
         auto it = impl_->id_to_index.find(id_code);
-        return (it != impl_->id_to_index.end()) ? it->second : UINT32_MAX;
+        return (it != impl_->id_to_index.end() && !it->second.empty())
+                   ? it->second.front()
+                   : UINT32_MAX;
     }
 
     QueryResult VcdParser::query(

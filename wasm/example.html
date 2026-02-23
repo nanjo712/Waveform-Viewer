@@ -300,6 +300,7 @@
 
       // Pre-fill query indices
       qIndices.value = sigs.slice(0, Math.min(5, sigs.length)).map(s => s.index).join(',');
+      qBegin.value = parser.getTimeBegin();
       qEnd.value = parser.getTimeEnd();
     }
 
