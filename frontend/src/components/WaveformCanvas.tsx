@@ -6,7 +6,7 @@ import {
 } from 'react';
 import { useAppContext } from '../hooks/useAppContext';
 import type { SignalQueryResult } from '../types/vcd';
-import { formatSignalValue } from '../utils/format';
+
 
 // ── Color palette for signals ──────────────────────────────────────
 
@@ -214,12 +214,23 @@ export function WaveformCanvas() {
                     viewEnd
                 );
             } else {
-                const format = state.signalFormats[sigIdx] || 'Hex';
+                const formatId = state.signalFormats[sigIdx] || 'Hex';
+                let currentView: any = null;
+                for (const p of state.formatPlugins) {
+                    for (const v of p.views) {
+                        if (v.id === formatId) {
+                            currentView = v;
+                            break;
+                        }
+                    }
+                    if (currentView) break;
+                }
+
                 drawMultiBitWaveform(
                     ctx,
                     result,
                     sig.width,
-                    format,
+                    currentView,
                     timeToX,
                     rowTop,
                     rowBot,
@@ -340,7 +351,7 @@ export function WaveformCanvas() {
         ctx: CanvasRenderingContext2D,
         result: SignalQueryResult,
         width: number,
-        format: string,
+        formatView: any,
         timeToX: (t: number) => number,
         rowTop: number,
         rowBot: number,
@@ -376,7 +387,23 @@ export function WaveformCanvas() {
             const toX = Math.min(seg.to, canvasWidth + slant);
             if (fromX >= toX) continue;
 
-            const parsed = formatSignalValue(seg.val, width, format);
+            const fallbackFormat = (val: string, w: number) => {
+                let r = val;
+                if (r.startsWith('b') || r.startsWith('B')) r = r.slice(1);
+                const isX = r.includes('x') || r.includes('X');
+                const isZ = r.includes('z') || r.includes('Z');
+                if (isX) return { display: 'X', isX: true, isZ: false };
+                if (isZ) return { display: 'Z', isX: false, isZ: true };
+                try {
+                    const bigValue = BigInt('0b' + r.padStart(w, '0'));
+                    return { display: '0x' + bigValue.toString(16).toUpperCase(), isX: false, isZ: false };
+                } catch {
+                    return { display: r, isX: false, isZ: false };
+                }
+            };
+
+            const formatter = formatView?.format || fallbackFormat;
+            const parsed = formatter(seg.val, width);
 
             if (parsed.isX) {
                 ctx.fillStyle = 'rgba(244, 71, 71, 0.15)';
@@ -656,6 +683,32 @@ export function WaveformCanvas() {
                     View: {formatTime(state.viewStart, unit)} -{' '}
                     {formatTime(state.viewEnd, unit)}
                 </span>
+
+                {state.activeSignalIndex !== null && state.signals[state.activeSignalIndex] && state.signals[state.activeSignalIndex].width > 1 && (
+                    <div className="active-signal-format">
+                        <span className="format-label" style={{ marginRight: '8px', color: 'var(--text-muted)' }}>Format ({state.signals[state.activeSignalIndex].name}):</span>
+                        <select
+                            className="signal-format"
+                            value={state.signalFormats[state.activeSignalIndex] || 'Hex'}
+                            onChange={(e) => dispatch({ type: 'SET_SIGNAL_FORMAT', index: state.activeSignalIndex!, format: e.target.value })}
+                            title="Format"
+                        >
+                            {state.formatPlugins.map(plugin => {
+                                const activeSig = state.signals[state.activeSignalIndex!];
+                                const validViews = plugin.views.filter(v => v.supportedWidths === 'any' || v.supportedWidths.includes(activeSig.width));
+                                if (validViews.length === 0) return null;
+                                return (
+                                    <optgroup key={plugin.id} label={plugin.name}>
+                                        {validViews.map(v => (
+                                            <option key={v.id} value={v.id}>{v.name}</option>
+                                        ))}
+                                    </optgroup>
+                                );
+                            })}
+                        </select>
+                    </div>
+                )}
+
                 <div className="zoom-controls">
                     <button className="btn btn-icon" onClick={handleZoomIn} title="Zoom In">+</button>
                     <button className="btn btn-icon" onClick={handleZoomOut} title="Zoom Out">-</button>
@@ -674,7 +727,11 @@ export function WaveformCanvas() {
                         const sig = state.signals[sigIdx];
                         if (!sig) return null;
                         return (
-                            <div key={sigIdx} className="signal-name-row">
+                            <div
+                                key={sigIdx}
+                                className={`signal-name-row ${state.activeSignalIndex === sigIdx ? 'active' : ''}`}
+                                onClick={() => dispatch({ type: 'SET_ACTIVE_SIGNAL', index: sigIdx })}
+                            >
                                 <div
                                     className="signal-color-bar"
                                     style={{ backgroundColor: getSignalColor(rowIdx) }}
@@ -683,28 +740,15 @@ export function WaveformCanvas() {
                                     {sig.name}
                                     {sig.width > 1 && ` [${sig.msb ?? sig.width - 1}:${sig.lsb ?? 0}]`}
                                 </span>
-                                {sig.width > 1 && (
-                                    <select
-                                        className="signal-format"
-                                        value={state.signalFormats[sigIdx] || 'Hex'}
-                                        onChange={(e) => dispatch({ type: 'SET_SIGNAL_FORMAT', index: sigIdx, format: e.target.value })}
-                                        title="Format"
-                                    >
-                                        <option value="Bin">Bin</option>
-                                        <option value="Oct">Oct</option>
-                                        <option value="Dec">Dec</option>
-                                        <option value="Hex">Hex</option>
-                                        <option value="FP16">FP16</option>
-                                        <option value="FP32">FP32</option>
-                                        <option value="FP64">FP64</option>
-                                        <option value="ASCII">ASCII</option>
-                                    </select>
-                                )}
                                 <button
                                     className="signal-remove"
-                                    onClick={() =>
-                                        dispatch({ type: 'REMOVE_SIGNAL', index: sigIdx })
-                                    }
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        dispatch({ type: 'REMOVE_SIGNAL', index: sigIdx });
+                                        if (state.activeSignalIndex === sigIdx) {
+                                            dispatch({ type: 'SET_ACTIVE_SIGNAL', index: null });
+                                        }
+                                    }}
                                     title="Remove signal"
                                 >
                                     &#10005;

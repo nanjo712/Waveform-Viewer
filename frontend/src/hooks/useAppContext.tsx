@@ -14,6 +14,9 @@ import type {
     VcdMetadata,
     QueryResult,
 } from '../types/vcd';
+import type { FormatPlugin } from '../types/plugin';
+import { coreRadixPlugin } from '../plugins/coreRadixPlugin';
+import { coreFloatPlugin } from '../plugins/coreFloatPlugin';
 
 // ── State ──────────────────────────────────────────────────────────────
 
@@ -51,6 +54,12 @@ interface AppState {
 
     /** Custom format overrides per signal index */
     signalFormats: Record<number, string>;
+
+    /** Dynamically loaded viewer format plugins */
+    formatPlugins: FormatPlugin[];
+
+    /** The signal currently active for setting UI properties (like format) */
+    activeSignalIndex: number | null;
 }
 
 const initialState: AppState = {
@@ -70,6 +79,8 @@ const initialState: AppState = {
     searchQuery: '',
     sidebarCollapsed: false,
     signalFormats: {},
+    formatPlugins: [coreRadixPlugin, coreFloatPlugin],
+    activeSignalIndex: null,
 };
 
 // ── Actions ────────────────────────────────────────────────────────────
@@ -93,7 +104,9 @@ type Action =
     | { type: 'SET_SEARCH'; query: string }
     | { type: 'TOGGLE_SIDEBAR' }
     | { type: 'MOVE_SIGNAL'; fromIdx: number; toIdx: number }
-    | { type: 'SET_SIGNAL_FORMAT'; index: number; format: string };
+    | { type: 'SET_SIGNAL_FORMAT'; index: number; format: string }
+    | { type: 'REGISTER_PLUGIN'; plugin: FormatPlugin }
+    | { type: 'SET_ACTIVE_SIGNAL'; index: number | null };
 
 function reducer(state: AppState, action: Action): AppState {
     switch (action.type) {
@@ -177,6 +190,16 @@ function reducer(state: AppState, action: Action): AppState {
                 },
             };
 
+        case 'REGISTER_PLUGIN':
+            // Prevent duplicate registering
+            if (state.formatPlugins.some(p => p.id === action.plugin.id)) {
+                return state;
+            }
+            return { ...state, formatPlugins: [...state.formatPlugins, action.plugin] };
+
+        case 'SET_ACTIVE_SIGNAL':
+            return { ...state, activeSignalIndex: action.index };
+
         default:
             return state;
     }
@@ -204,6 +227,17 @@ const vcdService = new VcdService();
 
 export function AppProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(reducer, initialState);
+
+    // Bind window.WaveformViewer globally so plugins can register themselves
+    useEffect(() => {
+        (window as any).WaveformViewer = {
+            ...((window as any).WaveformViewer || {}),
+            registerPlugin: (plugin: FormatPlugin) => {
+                dispatch({ type: 'REGISTER_PLUGIN', plugin });
+                console.log(`Plugin registered: ${plugin.name} (${plugin.id})`);
+            }
+        };
+    }, []);
 
     // Initialize WASM on mount
     useEffect(() => {

@@ -692,3 +692,28 @@ body,
 .resize-handle.active {
   background: var(--accent);
 }
+
+/* ── UI Enhancements ──────────────────────────────────────────── */
+.signal-name-row {
+  cursor: pointer;
+}
+
+.signal-name-row:hover {
+  background-color: var(--bg-hover);
+}
+
+.signal-name-row.active {
+  background-color: var(--bg-selected, rgba(60, 100, 200, 0.2));
+  border-left: 2px solid var(--accent);
+}
+
+.active-signal-format {
+  display: flex;
+  align-items: center;
+  margin-right: auto;
+  margin-left: 16px;
+  background-color: var(--bg-input);
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
