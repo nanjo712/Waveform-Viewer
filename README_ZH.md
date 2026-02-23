@@ -1,6 +1,67 @@
-# Waveform Viewer
+# <img src="assets/logo.png" width="40" height="40" align="center" style="border-radius: 8px;" /> Waveform Viewer
 
 [English](README.md) | **中文**
+
+Waveform Viewer 是一个高性能的 Web 波形查看器，核心解析器采用 C++ 编写并通过 WebAssembly 技术在浏览器中运行。
+
+## 使用方式
+
+### 1. 在线使用 (GitHub Pages)
+
+您可以直接访问托管在 GitHub Pages 上的在线版本，无需安装任何软件：
+
+👉 **[在线访问 Waveform Viewer](https://nanjo712.github.io/Waveform-Viewer/)**
+
+### 2. 获取预构建产物 (Releases)
+
+如果您希望在本地独立运行或使用桌面版（由 Tauri 驱动），可以从 GitHub Releases 页面获取预构建的二进制产物。
+
+1. 访问 [Releases 页面](https://github.com/nanjo712/Waveform-Viewer/releases)。
+2. 下载对应您操作系统的压缩包或安装程序（Windows, macOS, Linux）。
+3. 解压并运行即可。
+
+### 3. 自行构建 (Fork & Build)
+
+如果您想进行二次开发或自行构建，请按照以下步骤操作：
+
+#### 环境依赖
+
+- **Node.js** (建议 v20+)
+- **Emscripten** (用于编译 C++ 为 WASM)
+- **Make** (构建工具)
+- **Rust/Tauri** (可选，仅构建桌面版时需要)
+
+#### 构建步骤
+
+1. **Fork 并克隆仓库**:
+   ```bash
+   git clone https://github.com/nanjo712/Waveform-Viewer.git
+   cd Waveform-Viewer
+   ```
+
+2. **编译 WASM 核心**:
+   ```bash
+   make wasm
+   ```
+
+3. **构建前端**:
+   ```bash
+   make frontend
+   ```
+
+4. **生成静态部署包**:
+   ```bash
+   make static
+   ```
+   构建完成后，所有的产物将存放在 `./dist` 目录下。
+
+5. **本地开发预览**:
+   ```bash
+   make dev
+   ```
+   然后在浏览器中打开 `http://localhost:3000`。
+
+---
 
 ## 插件开发指南
 

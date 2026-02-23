@@ -2,6 +2,67 @@
 
 **English** | [中文](README_ZH.md)
 
+Waveform Viewer is a high-performance web-based waveform viewer. The core parser is written in C++ and runs in the browser via WebAssembly.
+
+## Usage
+
+### 1. Online Use (GitHub Pages)
+
+You can access the online version hosted on GitHub Pages directly without installing any software:
+
+👉 **[Access Waveform Viewer Online](https://nanjo712.github.io/Waveform-Viewer/)**
+
+### 2. Pre-built Binaries (Releases)
+
+If you wish to run it independently or use the desktop version (powered by Tauri), you can obtain pre-built binaries from the GitHub Releases page.
+
+1. Visit the [Releases Page](https://github.com/nanjo712/Waveform-Viewer/releases).
+2. Download the package or installer for your operating system (Windows, macOS, Linux).
+3. Extract and run it.
+
+### 3. Self-Build (Fork & Build)
+
+If you want to do secondary development or build it yourself, please follow these steps:
+
+#### Prerequisites
+
+- **Node.js** (v20+ recommended)
+- **Emscripten** (for compiling C++ to WASM)
+- **Make** (build tool)
+- **Rust/Tauri** (optional, required only for building the desktop version)
+
+#### Build Steps
+
+1. **Fork and Clone the Repository**:
+   ```bash
+   git clone https://github.com/nanjo712/Waveform-Viewer.git
+   cd Waveform-Viewer
+   ```
+
+2. **Compile WASM Core**:
+   ```bash
+   make wasm
+   ```
+
+3. **Build Frontend**:
+   ```bash
+   make frontend
+   ```
+
+4. **Generate Static Build**:
+   ```bash
+   make static
+   ```
+   After the build is complete, all artifacts will be stored in the `./dist` directory.
+
+5. **Local Development Preview**:
+   ```bash
+   make dev
+   ```
+   Then open `http://localhost:3000` in your browser.
+
+---
+
 ## Plugin Development Guide
 
 > [!NOTE]
