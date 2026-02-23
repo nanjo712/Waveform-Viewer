@@ -1,4 +1,4 @@
-# Waveform Viewer
+# <img src="assets/logo.png" width="40" height="40" align="center" style="border-radius: 8px;" /> Waveform Viewer
 
 **English** | [中文](README_ZH.md)
 

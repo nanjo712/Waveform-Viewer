@@ -83,6 +83,7 @@ export function TitleBar() {
                     &#9776;
                 </button>
                 <span className="titlebar-title">
+                    <img src="/favicon.png" alt="Logo" className="app-logo" />
                     <strong>Waveform Viewer</strong>
                     {state.fileName && ` - ${state.fileName}`}
                 </span>
