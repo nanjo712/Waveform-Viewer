@@ -56,6 +56,7 @@ jobs:
         run: make build
 
       - name: Build Tauri App
+        id: tauri_build
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,3 +67,14 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Upload portable binary (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.tauri_build.outputs.releaseUploadUrl }}
+          asset_path: ./src-tauri/target/release/waveform-viewer.exe
+          asset_name: waveform-viewer.exe
+          asset_content_type: application/octet-stream
