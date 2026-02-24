@@ -22,11 +22,12 @@ else
     EMMAKE  := emmake
 endif
 
-.PHONY: all wasm frontend dev start build static serve clean help
+.PHONY: all wasm native frontend dev start build static serve clean help
 
 help:
 	@echo "Usage:"
 	@echo "  make wasm       Build WASM module"
+	@echo "  make native     Build native CLI (vcd_viewer)"
 	@echo "  make frontend   Build React frontend"
 	@echo "  make dev        Start Vite dev server (on port 3000)"
 	@echo "  make start      Alias for 'make wasm dev'"
@@ -47,6 +48,14 @@ wasm: $(BUILD_DIR)/Makefile
 	@echo ">>> Copying WASM artifacts to $(PUBLIC_WASM)/"
 	@mkdir -p $(PUBLIC_WASM)
 	@cp $(WASM_OUT)/vcd_parser.{js,wasm} $(PUBLIC_WASM)/
+
+# ── Native build ────────────────────────────────────────────────────
+
+native:
+	@echo ">>> Building Native CLI..."
+	@mkdir -p build-native
+	@cd build-native && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j$(NPROC)
+
 
 # ── Frontend ────────────────────────────────────────────────────────
 
@@ -85,5 +94,5 @@ serve:
 
 clean:
 	@echo ">>> Cleaning..."
-	@rm -rf $(BUILD_DIR) $(FRONTEND)/dist dist
+	@rm -rf $(BUILD_DIR) build-native $(FRONTEND)/dist dist
 	@rm -f $(PUBLIC_WASM)/vcd_parser.{js,wasm}

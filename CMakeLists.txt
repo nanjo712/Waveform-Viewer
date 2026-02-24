@@ -42,13 +42,14 @@ if(EMSCRIPTEN)
     target_link_options(vcd_parser PRIVATE
         --bind
         -sWASM=1
+        -sWASM_BIGINT=1
         -sMODULARIZE=1
         -sEXPORT_NAME=createVcdParser
         -sALLOW_MEMORY_GROWTH=1
         -sMAXIMUM_MEMORY=2GB
         -sSTACK_SIZE=1MB
         -sINITIAL_MEMORY=16MB
-        -sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToUTF8','lengthBytesUTF8']
+        -sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToUTF8','lengthBytesUTF8','HEAPU8']
         -sENVIRONMENT=web,worker,node
         -sNO_EXIT_RUNTIME=1
         -sFILESYSTEM=0
