@@ -11,8 +11,7 @@ export function TitleBar() {
         async (file: File) => {
             setLoading(true);
             try {
-                const buffer = await file.arrayBuffer();
-                const ok = vcdService.parseFile(buffer);
+                const ok = await vcdService.indexFile(file);
                 if (ok) {
                     const metadata = vcdService.getMetadata();
                     const signals = vcdService.getSignals();
@@ -89,7 +88,7 @@ export function TitleBar() {
                 </span>
             </div>
             <div className="titlebar-right">
-                {loading && <span style={{ color: 'var(--text-warning)' }}>Parsing...</span>}
+                {loading && <span style={{ color: 'var(--text-warning)' }}>Indexing...</span>}
                 <button
                     className="btn"
                     onClick={handleOpenPlugin}

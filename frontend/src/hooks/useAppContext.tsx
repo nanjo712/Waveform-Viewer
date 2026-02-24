@@ -289,7 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }, []);
 
     // Query waveform data whenever view or visible signals change
-    const doQuery = useCallback(() => {
+    const doQuery = useCallback(async () => {
         if (
             !vcdService.isFileLoaded ||
             state.visibleRowIndices.length === 0
@@ -297,7 +297,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return;
 
         try {
-            const result = vcdService.query(
+            const result = await vcdService.query(
                 state.viewStart,
                 state.viewEnd,
                 state.visibleRowIndices

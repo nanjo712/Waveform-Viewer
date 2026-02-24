@@ -344,8 +344,14 @@ export function Sidebar() {
                                 <span className="value">{state.metadata.signalCount}</span>
                             </div>
                             <div className="metadata-row">
-                                <span className="label">Transitions</span>
-                                <span className="value">{state.metadata.totalTransitions}</span>
+                                <span className="label">Snapshots</span>
+                                <span className="value">{state.metadata.snapshotCount}</span>
+                            </div>
+                            <div className="metadata-row">
+                                <span className="label">Index Memory</span>
+                                <span className="value">
+                                    {(state.metadata.indexMemoryUsage / 1024).toFixed(1)} KB
+                                </span>
                             </div>
                         </div>
                     )}

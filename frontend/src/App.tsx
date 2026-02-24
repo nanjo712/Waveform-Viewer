@@ -38,8 +38,7 @@ function App() {
 
         setIsLoadingFile(true);
         try {
-            const buffer = await file.arrayBuffer();
-            const ok = vcdService.parseFile(buffer);
+            const ok = await vcdService.indexFile(file);
             if (ok) {
                 const metadata = vcdService.getMetadata();
                 const signals = vcdService.getSignals();
@@ -107,7 +106,7 @@ function App() {
             {isLoadingFile && (
                 <div className="loading-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(30, 30, 30, 0.85)', zIndex: 9999 }}>
                     <div className="spinner" />
-                    <div>Parsing VCD file...</div>
+                    <div>Indexing VCD file...</div>
                 </div>
             )}
             <TitleBar />

@@ -265,7 +265,20 @@ namespace vcd
 
                 if (parse_state == ParseState::Header)
                 {
-                    parse_header_line(line);
+                    // After $enddefinitions, some VCD files (e.g. Verilator)
+                    // omit $dumpvars and go straight to timestamps/values.
+                    // Auto-transition to Data when we see a non-$ line after
+                    // the header is done.
+                    if (header_done && line[0] != '$')
+                    {
+                        parse_state = ParseState::Data;
+                        if (!parse_data_line(line, line_abs_offset))
+                            return false;
+                    }
+                    else
+                    {
+                        parse_header_line(line);
+                    }
                 }
                 else
                 {
