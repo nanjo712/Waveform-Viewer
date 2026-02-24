@@ -3,9 +3,12 @@ import {
     useEffect,
     useCallback,
     useMemo,
+    useState,
 } from 'react';
 import { useAppContext } from '../hooks/useAppContext';
 import type { SignalQueryResult } from '../types/vcd';
+import { unflattenChisel, buildSignalDisplayMap } from '../utils/chisel';
+import type { SignalDisplayInfo } from '../utils/chisel';
 
 
 // ── Color palette for signals ──────────────────────────────────────
@@ -93,6 +96,56 @@ export function WaveformCanvas() {
         }
         return map;
     }, [state.queryResult]);
+
+    // ── Build display-name map when Chisel mode is active ─────────
+
+    const displayMap = useMemo<Map<number, SignalDisplayInfo> | null>(() => {
+        if (!state.unflattenChisel || !state.hierarchy) return null;
+        const tree = unflattenChisel(state.hierarchy, state.signals);
+        return buildSignalDisplayMap(tree);
+    }, [state.unflattenChisel, state.hierarchy, state.signals]);
+
+    // ── Tooltip state for signal name hover ───────────────────────
+
+    const [tooltip, setTooltip] = useState<{
+        visible: boolean;
+        x: number;
+        y: number;
+        lines: string[];
+    }>({ visible: false, x: 0, y: 0, lines: [] });
+
+    const handleSignalMouseEnter = useCallback(
+        (e: React.MouseEvent, sigIdx: number) => {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const info = displayMap?.get(sigIdx);
+            const sig = state.signals[sigIdx];
+            if (!sig) return;
+
+            let lines: string[];
+            if (info && info.scopePath.length > 0) {
+                // Chisel mode: show scope path + display name
+                lines = [...info.scopePath, info.displayName];
+            } else if (info) {
+                // Chisel mode but signal is at root level
+                lines = [info.displayName];
+            } else {
+                // Non-Chisel mode: show full hierarchical path
+                lines = sig.fullPath.split('.');
+            }
+
+            setTooltip({
+                visible: true,
+                x: rect.right + 8,
+                y: rect.top + rect.height / 2,
+                lines,
+            });
+        },
+        [displayMap, state.signals]
+    );
+
+    const handleSignalMouseLeave = useCallback(() => {
+        setTooltip(prev => ({ ...prev, visible: false }));
+    }, []);
 
     // ── Draw function ──────────────────────────────────────────────
 
@@ -777,18 +830,22 @@ export function WaveformCanvas() {
                     {visibleNamesData.map(({ sigIdx, rowIdx }) => {
                         const sig = state.signals[sigIdx];
                         if (!sig) return null;
+                        const info = displayMap?.get(sigIdx);
+                        const displayName = info?.displayName ?? sig.name;
                         return (
                             <div
                                 key={sigIdx}
                                 className={`signal-name-row ${state.activeSignalIndex === sigIdx ? 'active' : ''}`}
                                 onClick={() => dispatch({ type: 'SET_ACTIVE_SIGNAL', index: sigIdx })}
+                                onMouseEnter={(e) => handleSignalMouseEnter(e, sigIdx)}
+                                onMouseLeave={handleSignalMouseLeave}
                             >
                                 <div
                                     className="signal-color-bar"
                                     style={{ backgroundColor: getSignalColor(rowIdx) }}
                                 />
-                                <span className="signal-name-text" title={sig.fullPath}>
-                                    {sig.name}
+                                <span className="signal-name-text">
+                                    {displayName}
                                     {sig.width > 1 && ` [${sig.msb ?? sig.width - 1}:${sig.lsb ?? 0}]`}
                                 </span>
                                 <button
@@ -809,6 +866,27 @@ export function WaveformCanvas() {
                     })}
                     {/* Bottom padding to substitute unloaded items */}
                 </div>
+
+                {/* Signal name tooltip */}
+                {tooltip.visible && (
+                    <div
+                        className="signal-tooltip"
+                        style={{
+                            left: tooltip.x,
+                            top: tooltip.y,
+                            transform: 'translateY(-50%)',
+                        }}
+                    >
+                        {tooltip.lines.map((segment, i) => (
+                            <span key={i}>
+                                {i > 0 && <span className="tooltip-separator">{' > '}</span>}
+                                <span className={i === tooltip.lines.length - 1 ? 'tooltip-name' : 'tooltip-path'}>
+                                    {segment}
+                                </span>
+                            </span>
+                        ))}
+                    </div>
+                )}
 
                 {/* Waveform canvas */}
                 <div

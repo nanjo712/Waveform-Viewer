@@ -548,6 +548,37 @@ body,
     flex-shrink: 0;
 }
 
+/* ── Signal Tooltip ────────────────────────────────────────────────── */
+
+.signal-tooltip {
+    position: fixed;
+    z-index: 1000;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: var(--font-size);
+    line-height: 1.5;
+    color: var(--text-primary);
+    pointer-events: none;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.signal-tooltip .tooltip-path {
+    color: var(--text-secondary);
+}
+
+.signal-tooltip .tooltip-separator {
+    color: var(--text-muted);
+}
+
+.signal-tooltip .tooltip-name {
+    color: var(--text-accent);
+    font-weight: 500;
+}
+
 /* ── Canvas Waveform Area ──────────────────────────────────────────── */
 
 .waveform-canvas-container {

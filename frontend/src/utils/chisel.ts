@@ -1,5 +1,21 @@
 import type { ScopeNode, SignalDef } from '../types/vcd';
 
+/**
+ * Checks if a signal name matches Chisel/FIRRTL compiler-generated temporary patterns.
+ * These include:
+ *   - ^_            : leading underscore — inlined sub-module port connections
+ *                     (e.g. _accumulator_0_io_out, _pes_0_0_io_data_east_data_raw_bits)
+ *   - _T / _T_N    : intermediate expression temporaries
+ *   - _GEN / _GEN_N: mux/conditional assignment wires
+ *   - _RANDOM       : simulation random init values
+ *   - _WIRE / _WIRE_N: anonymous Wire() declarations
+ */
+const COMPILER_GENERATED_RE = /^_|_T(_\d+)?$|_GEN(_\d+)?$|_RANDOM|_WIRE(_\d+)?$/;
+
+function isCompilerGenerated(name: string): boolean {
+    return COMPILER_GENERATED_RE.test(name);
+}
+
 export function unflattenChisel(node: ScopeNode, signals: SignalDef[]): ScopeNode {
     const clone: ScopeNode = {
         name: node.name,
@@ -21,10 +37,17 @@ export function unflattenChisel(node: ScopeNode, signals: SignalDef[]): ScopeNod
     };
 
     const root: TrieNode = { name: '', children: new Map(), sigIndices: [], leafCount: 0 };
+    const compilerGeneratedSignals: { index: number; name: string }[] = [];
 
     for (const idx of node.signals) {
         const sig = signals[idx];
         if (!sig) continue;
+
+        // Filter out compiler-generated temporary signals
+        if (isCompilerGenerated(sig.name)) {
+            compilerGeneratedSignals.push({ index: idx, name: sig.name });
+            continue;
+        }
 
         const parts = sig.name.split('_');
         let current = root;
@@ -89,6 +112,20 @@ export function unflattenChisel(node: ScopeNode, signals: SignalDef[]): ScopeNod
 
     traverseTrie(root, clone);
 
+    // Place compiler-generated temporary signals into a dedicated _COMPILER_GENERATED_ scope
+    if (compilerGeneratedSignals.length > 0) {
+        const compilerScope: ScopeNode = {
+            name: '_COMPILER_GENERATED_',
+            fullPath: clone.fullPath ? clone.fullPath + '._COMPILER_GENERATED_' : '_COMPILER_GENERATED_',
+            children: [],
+            uiSignals: compilerGeneratedSignals.map(s => ({ index: s.index, name: s.name })),
+            signals: [],
+        };
+        compilerScope.uiSignals!.sort((a, b) => a.name.localeCompare(b.name));
+        if (!clone.children) clone.children = [];
+        clone.children.push(compilerScope);
+    }
+
     // Sort synthetic children and signals if any
     if (clone.children) {
         clone.children.sort((a, b) => a.name.localeCompare(b.name));
@@ -98,6 +135,61 @@ export function unflattenChisel(node: ScopeNode, signals: SignalDef[]): ScopeNod
     }
 
     return clone;
+}
+
+/** Display metadata for a signal in the waveform list under Chisel mode. */
+export interface SignalDisplayInfo {
+    /** The shortened display name produced by trie-based unflattening. */
+    displayName: string;
+    /** Scope path from root to the signal (excludes `<root>` and `_COMPILER_GENERATED_`). */
+    scopePath: string[];
+}
+
+/**
+ * Walk an unflattened ScopeNode tree and build a map from signal index to its
+ * display name and hierarchical scope path.
+ *
+ * For signals inside the synthetic `_COMPILER_GENERATED_` scope, the path
+ * reflects the real parent scope (i.e. `_COMPILER_GENERATED_` is omitted).
+ */
+export function buildSignalDisplayMap(root: ScopeNode): Map<number, SignalDisplayInfo> {
+    const map = new Map<number, SignalDisplayInfo>();
+
+    function walk(node: ScopeNode, pathStack: string[]) {
+        // Determine the path to pass to children / signals in this node.
+        const isVirtualRoot = node.name === '<root>';
+        const isCompilerScope = node.name === '_COMPILER_GENERATED_';
+        // Only push real scope names into the path.
+        const currentPath = (isVirtualRoot || isCompilerScope)
+            ? pathStack
+            : [...pathStack, node.name];
+
+        if (node.uiSignals) {
+            for (const uSig of node.uiSignals) {
+                let displayName = uSig.name;
+                let scopePath = currentPath;
+
+                // When the display name is a pure number (e.g. "0", "3"), merge it
+                // with the last scope segment: "data" + "0" → "data[0]"
+                if (/^\d+$/.test(displayName) && scopePath.length > 0) {
+                    const parentName = scopePath[scopePath.length - 1];
+                    displayName = `${parentName}[${displayName}]`;
+                    scopePath = scopePath.slice(0, -1);
+                }
+
+                map.set(uSig.index, { displayName, scopePath });
+            }
+        }
+
+        if (node.children) {
+            for (const child of node.children) {
+                walk(child, currentPath);
+            }
+        }
+    }
+
+    walk(root, []);
+    return map;
 }
 
 export function getAllSignalsInScope(node: ScopeNode): number[] {
