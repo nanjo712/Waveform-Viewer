@@ -12,3 +12,5 @@ dist
 callgrind.out.*
 frontend/packages/**/public/wasm/vcd_parser.js
 frontend/packages/**/public/wasm/vcd_parser.wasm
+frontend/packages/**/media/wasm/vcd_parser.js
+frontend/packages/**/media/wasm/vcd_parser.wasm

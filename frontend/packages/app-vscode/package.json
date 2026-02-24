@@ -1,0 +1,98 @@
+{
+    "name": "@waveform-viewer/app-vscode",
+    "displayName": "Waveform Viewer",
+    "description": "View VCD waveform files natively in VSCode",
+    "version": "0.2.0",
+    "private": true,
+    "publisher": "waveform-viewer",
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Visualization"
+    ],
+    "activationEvents": [],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "customEditors": [
+            {
+                "viewType": "waveformViewer.vcdEditor",
+                "displayName": "Waveform Viewer",
+                "selector": [
+                    {
+                        "filenamePattern": "*.vcd"
+                    }
+                ],
+                "priority": "default"
+            }
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "waveform-viewer",
+                    "title": "Waveform Viewer",
+                    "icon": "$(pulse)"
+                }
+            ]
+        },
+        "views": {
+            "waveform-viewer": [
+                {
+                    "id": "waveformViewer.signalTree",
+                    "name": "Signal Explorer",
+                    "type": "tree"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "waveformViewer.toggleChiselHierarchy",
+                "title": "Toggle Chisel Hierarchy",
+                "category": "Waveform Viewer"
+            },
+            {
+                "command": "waveformViewer.loadPlugin",
+                "title": "Load Format Plugin",
+                "category": "Waveform Viewer"
+            },
+            {
+                "command": "waveformViewer.zoomIn",
+                "title": "Zoom In",
+                "category": "Waveform Viewer"
+            },
+            {
+                "command": "waveformViewer.zoomOut",
+                "title": "Zoom Out",
+                "category": "Waveform Viewer"
+            },
+            {
+                "command": "waveformViewer.zoomFit",
+                "title": "Zoom to Fit",
+                "category": "Waveform Viewer"
+            }
+        ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "waveformViewer.toggleChiselHierarchy",
+                    "when": "view == waveformViewer.signalTree",
+                    "group": "navigation"
+                }
+            ]
+        }
+    },
+    "scripts": {
+        "build": "node esbuild.mjs",
+        "watch": "node esbuild.mjs --watch",
+        "package": "vsce package"
+    },
+    "dependencies": {
+        "@waveform-viewer/core": "*",
+        "@waveform-viewer/react-ui": "*"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.85.0",
+        "esbuild": "^0.25.0"
+    }
+}

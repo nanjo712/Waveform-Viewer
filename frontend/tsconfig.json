@@ -4,6 +4,8 @@
         { "path": "./packages/core" },
         { "path": "./packages/react-ui" },
         { "path": "./packages/app-web" },
-        { "path": "./packages/app-tauri" }
+        { "path": "./packages/app-tauri" },
+        { "path": "./packages/app-vscode" },
+        { "path": "./packages/app-vscode/tsconfig.webview.json" }
     ]
 }

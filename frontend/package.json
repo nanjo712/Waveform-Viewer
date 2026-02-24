@@ -7,14 +7,16 @@
         "packages/core",
         "packages/react-ui",
         "packages/app-web",
-        "packages/app-tauri"
+        "packages/app-tauri",
+        "packages/app-vscode"
     ],
     "scripts": {
         "dev": "npm run dev -w @waveform-viewer/app-web",
         "dev:tauri": "npm run dev -w @waveform-viewer/app-tauri",
         "build": "npm run build -w @waveform-viewer/app-web",
         "build:tauri": "npm run build -w @waveform-viewer/app-tauri",
-        "build:all": "npm run build -w @waveform-viewer/app-web && npm run build -w @waveform-viewer/app-tauri",
+        "build:vscode": "npm run build -w @waveform-viewer/app-vscode",
+        "build:all": "npm run build -w @waveform-viewer/app-web && npm run build -w @waveform-viewer/app-tauri && npm run build -w @waveform-viewer/app-vscode",
         "lint": "eslint .",
         "preview": "npm run preview -w @waveform-viewer/app-web"
     },

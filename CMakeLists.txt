@@ -54,6 +54,7 @@ if(EMSCRIPTEN)
         -sNO_EXIT_RUNTIME=1
         -sFILESYSTEM=0
         -sDISABLE_EXCEPTION_CATCHING=1
+        -sDYNAMIC_EXECUTION=0
     )
 
     # Output to wasm/ directory

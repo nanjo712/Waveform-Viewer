@@ -1,0 +1,143 @@
+/**
+ * VSCode Webview Styles — remap custom CSS variables to VSCode theme variables.
+ *
+ * The existing App.css uses hardcoded hex colors mimicking VSCode's dark theme.
+ * Here we override those custom properties with actual --vscode-* equivalents,
+ * ensuring the waveform viewer respects the user's current VSCode theme.
+ */
+
+/* ── Variable remapping to VSCode theme tokens ───────────────────── */
+
+:root {
+    /* Background layers */
+    --bg-base: var(--vscode-editor-background, #1e1e1e);
+    --bg-sidebar: var(--vscode-sideBar-background, #252526);
+    --bg-panel: var(--vscode-editor-background, #1e1e1e);
+    --bg-editor: var(--vscode-editor-background, #1e1e1e);
+    --bg-titlebar: var(--vscode-titleBar-activeBackground, #323233);
+    --bg-input: var(--vscode-input-background, #3c3c3c);
+    --bg-hover: var(--vscode-list-hoverBackground, #2a2d2e);
+    --bg-active: var(--vscode-list-activeSelectionBackground, #37373d);
+    --bg-selection: var(--vscode-editor-selectionBackground, #264f78);
+    --bg-scrollbar: var(--vscode-scrollbarSlider-background, #424242);
+    --bg-scrollbar-hover: var(--vscode-scrollbarSlider-hoverBackground, #4f4f4f);
+    --bg-badge: var(--vscode-badge-background, #4d4d4d);
+
+    /* Borders */
+    --border-color: var(--vscode-panel-border, #3c3c3c);
+    --border-active: var(--vscode-focusBorder, #007acc);
+
+    /* Text */
+    --text-primary: var(--vscode-foreground, #cccccc);
+    --text-secondary: var(--vscode-descriptionForeground, #9d9d9d);
+    --text-muted: var(--vscode-disabledForeground, #6a6a6a);
+    --text-accent: var(--vscode-textLink-foreground, #4fc1ff);
+    --text-keyword: var(--vscode-symbolIcon-variableForeground, #569cd6);
+    --text-string: var(--vscode-debugTokenExpression-string, #ce9178);
+    --text-number: var(--vscode-debugTokenExpression-number, #b5cea8);
+    --text-warning: var(--vscode-editorWarning-foreground, #cca700);
+    --text-error: var(--vscode-editorError-foreground, #f48771);
+    --text-success: var(--vscode-testing-iconPassed, #89d185);
+
+    /* Accent / brand */
+    --accent: var(--vscode-button-background, #007acc);
+    --accent-hover: var(--vscode-button-hoverBackground, #1c97ea);
+    --accent-fg: var(--vscode-button-foreground, #ffffff);
+
+    /* Typography — inherit VSCode's font settings */
+    --font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
+    --font-mono: var(--vscode-editor-font-family, 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, 'Courier New', monospace);
+    --font-size: var(--vscode-font-size, 13px);
+    --font-size-sm: 12px;
+    --font-size-xs: 11px;
+
+    /* Layout — no sidebar in webview, no titlebar */
+    --sidebar-width: 0px;
+    --titlebar-height: 0px;
+}
+
+/* ── VSCode webview root layout ──────────────────────────────────── */
+
+html, body, #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+}
+
+.vscode-waveform-root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ── Hide elements that are handled natively by VSCode ───────────── */
+
+.sidebar,
+.titlebar,
+.statusbar {
+    display: none !important;
+}
+
+/* ── Ensure waveform panel fills the entire viewport ─────────────── */
+
+.waveform-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* ── Toolbar styling adjustments for VSCode ──────────────────────── */
+
+.waveform-toolbar {
+    background: var(--vscode-editorGroupHeader-tabsBackground, var(--bg-titlebar));
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ── Scrollbar styling to match VSCode ───────────────────────────── */
+
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bg-scrollbar);
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--bg-scrollbar-hover);
+}
+
+/* ── Select/dropdown styling for VSCode ──────────────────────────── */
+
+.signal-format {
+    background: var(--vscode-dropdown-background, var(--bg-input));
+    color: var(--vscode-dropdown-foreground, var(--text-primary));
+    border: 1px solid var(--vscode-dropdown-border, var(--border-color));
+}
+
+/* ── Button styling for VSCode ───────────────────────────────────── */
+
+.btn {
+    background: var(--vscode-button-secondaryBackground, var(--bg-input));
+    color: var(--vscode-button-secondaryForeground, var(--text-primary));
+    border: none;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background: var(--vscode-button-secondaryHoverBackground, var(--bg-hover));
+}

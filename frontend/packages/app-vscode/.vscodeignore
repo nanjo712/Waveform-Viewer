@@ -1,0 +1,8 @@
+node_modules/
+src/
+*.ts
+*.tsx
+tsconfig.json
+tsconfig.webview.json
+esbuild.mjs
+.vscodeignore
