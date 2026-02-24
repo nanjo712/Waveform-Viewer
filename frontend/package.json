@@ -1,17 +1,22 @@
 {
-    "name": "frontend",
+    "name": "waveform-viewer-frontend",
     "private": true,
     "version": "0.1.2",
     "type": "module",
+    "workspaces": [
+        "packages/core",
+        "packages/react-ui",
+        "packages/app-web",
+        "packages/app-tauri"
+    ],
     "scripts": {
-        "dev": "vite",
-        "build": "tsc -b && vite build",
+        "dev": "npm run dev -w @waveform-viewer/app-web",
+        "dev:tauri": "npm run dev -w @waveform-viewer/app-tauri",
+        "build": "npm run build -w @waveform-viewer/app-web",
+        "build:tauri": "npm run build -w @waveform-viewer/app-tauri",
+        "build:all": "npm run build -w @waveform-viewer/app-web && npm run build -w @waveform-viewer/app-tauri",
         "lint": "eslint .",
-        "preview": "vite preview"
-    },
-    "dependencies": {
-        "react": "^19.2.0",
-        "react-dom": "^19.2.0"
+        "preview": "npm run preview -w @waveform-viewer/app-web"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",

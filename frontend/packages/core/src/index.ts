@@ -1,0 +1,48 @@
+// ── Types ──────────────────────────────────────────────────────────────
+export type {
+    SignalDef,
+    ScopeNode,
+    TransitionEntry,
+    SignalQueryResult,
+    QueryResult,
+    QueryPlan,
+    QueryResultBinaryRaw,
+    VcdParser,
+    VcdParserModule,
+    VcdMetadata,
+} from './types/vcd.ts';
+
+export type {
+    FormatView,
+    FormatPlugin,
+} from './types/plugin.ts';
+
+export type {
+    PlatformAdapter,
+    PlatformFile,
+} from './types/platform.ts';
+
+// ── State ──────────────────────────────────────────────────────────────
+export {
+    appReducer,
+    initialState,
+} from './state/reducer.ts';
+export type {
+    AppState,
+    Action,
+} from './state/reducer.ts';
+
+// ── Services ───────────────────────────────────────────────────────────
+export { VcdService } from './wasm/vcdService.ts';
+
+// ── Plugins ────────────────────────────────────────────────────────────
+export { coreRadixPlugin } from './plugins/coreRadixPlugin.ts';
+export { coreFloatPlugin } from './plugins/coreFloatPlugin.ts';
+
+// ── Utils ──────────────────────────────────────────────────────────────
+export {
+    unflattenChisel,
+    buildSignalDisplayMap,
+    getAllSignalsInScope,
+} from './utils/chisel.ts';
+export type { SignalDisplayInfo } from './utils/chisel.ts';

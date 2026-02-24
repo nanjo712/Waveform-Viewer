@@ -7,7 +7,9 @@ EMSDK_ENV   := source ~/emsdk/emsdk_env.sh 2>/dev/null || true
 BUILD_DIR   := build-wasm
 FRONTEND    := frontend
 WASM_OUT    := wasm
-PUBLIC_WASM := $(FRONTEND)/public/wasm
+# Per-app public directories for WASM files
+PUBLIC_WASM_WEB   := $(FRONTEND)/packages/app-web/public/wasm
+PUBLIC_WASM_TAURI := $(FRONTEND)/packages/app-tauri/public/wasm
 
 # Environment Helpers
 WASM_RUN    := $(EMSDK_ENV) && mkdir -p $(BUILD_DIR) && cd $(BUILD_DIR)
@@ -45,9 +47,10 @@ $(BUILD_DIR)/Makefile:
 wasm: $(BUILD_DIR)/Makefile
 	@echo ">>> Building WASM module..."
 	@$(WASM_RUN) && $(EMMAKE) make -j$(NPROC)
-	@echo ">>> Copying WASM artifacts to $(PUBLIC_WASM)/"
-	@mkdir -p $(PUBLIC_WASM)
-	@cp $(WASM_OUT)/vcd_parser.{js,wasm} $(PUBLIC_WASM)/
+	@echo ">>> Copying WASM artifacts to app packages..."
+	@mkdir -p $(PUBLIC_WASM_WEB) $(PUBLIC_WASM_TAURI)
+	@cp $(WASM_OUT)/vcd_parser.{js,wasm} $(PUBLIC_WASM_WEB)/
+	@cp $(WASM_OUT)/vcd_parser.{js,wasm} $(PUBLIC_WASM_TAURI)/
 
 # ── Native build ────────────────────────────────────────────────────
 
@@ -66,11 +69,11 @@ $(FRONTEND)/node_modules: $(FRONTEND)/package.json
 
 frontend: $(FRONTEND)/node_modules wasm
 	@echo ">>> Building Production Frontend..."
-	@$(FE_RUN) && npx vite build
+	@$(FE_RUN) && npm run build
 
 dev: $(FRONTEND)/node_modules wasm
 	@echo ">>> Starting Dev Server..."
-	@$(FE_RUN) && npx vite --host
+	@$(FE_RUN) && npm run dev
 
 # ── Composite Targets ───────────────────────────────────────────────
 
@@ -80,7 +83,7 @@ build: frontend
 
 static: build
 	@echo ">>> Creating static package..."
-	@rm -rf dist && cp -r $(FRONTEND)/dist dist
+	@rm -rf dist && cp -r $(FRONTEND)/packages/app-web/dist dist
 
 serve:
 	@echo ">>> Serving static build on http://localhost:8080 ..."
@@ -94,5 +97,6 @@ serve:
 
 clean:
 	@echo ">>> Cleaning..."
-	@rm -rf $(BUILD_DIR) build-native $(FRONTEND)/dist dist
-	@rm -f $(PUBLIC_WASM)/vcd_parser.{js,wasm}
+	@rm -rf $(BUILD_DIR) build-native $(FRONTEND)/packages/app-web/dist $(FRONTEND)/packages/app-tauri/dist dist
+	@rm -f $(PUBLIC_WASM_WEB)/vcd_parser.{js,wasm}
+	@rm -f $(PUBLIC_WASM_TAURI)/vcd_parser.{js,wasm}
