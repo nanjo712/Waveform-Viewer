@@ -2,8 +2,11 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <cstring>
-#include <stdexcept>
+#include <string>
+#include <string_view>
+#include <unordered_map>
 
 namespace vcd
 {
@@ -44,6 +47,42 @@ namespace vcd
         return static_cast<uint8_t>((vec[word] >> shift) & 3);
     }
 
+    uint64_t encode_id(std::string_view id)
+    {
+        assert(id.size() <= 8 &&
+               "VCD ID exceeds 8 bytes! Potential collision hazard.");
+
+        uint64_t code = 0;
+        size_t len = std::min(static_cast<size_t>(8), id.size());
+        std::memcpy(&code, id.data(), len);
+        return code;
+    }
+
+    // ============================================================================
+    // Helper: parse $var type string to VarType enum
+    // ============================================================================
+
+    VarType parseVarType(std::string_view s)
+    {
+        if (s == "wire")      return VarType::Wire;
+        if (s == "reg")       return VarType::Reg;
+        if (s == "integer")   return VarType::Integer;
+        if (s == "real")      return VarType::Real;
+        if (s == "parameter") return VarType::Parameter;
+        if (s == "event")     return VarType::Event;
+        if (s == "supply0")   return VarType::Supply0;
+        if (s == "supply1")   return VarType::Supply1;
+        if (s == "tri")       return VarType::Tri;
+        if (s == "triand")    return VarType::TriAnd;
+        if (s == "trior")     return VarType::TriOr;
+        if (s == "trireg")    return VarType::TriReg;
+        if (s == "tri0")      return VarType::Tri0;
+        if (s == "tri1")      return VarType::Tri1;
+        if (s == "wand")      return VarType::WAnd;
+        if (s == "wor")       return VarType::WOr;
+        return VarType::Unknown;
+    }
+
     // ============================================================================
     // VcdParser::Impl
     // ============================================================================
@@ -72,14 +111,14 @@ namespace vcd
         // absolute file offset for any byte in the combined buffer.
         std::string leftover;
         uint64_t leftover_file_offset = 0;  // absolute file offset of
-                                             // leftover[0]
+                                            // leftover[0]
 
         // --- Metadata ---
         std::string date_str;
         std::string version_str;
         Timescale ts;
         std::vector<SignalDef> signal_defs;
-        std::unordered_map<std::string, std::vector<uint32_t>> id_to_index;
+        std::unordered_map<uint64_t, std::vector<uint32_t>> id_to_index;
         std::unordered_map<std::string, uint32_t> path_to_index;
         std::unique_ptr<ScopeNode> root;
         ScopeNode* current_scope = nullptr;
@@ -203,7 +242,7 @@ namespace vcd
                 return;
             }
 
-            auto it = id_to_index.find(std::string(id_tok));
+            auto it = id_to_index.find(encode_id(id_tok));
             if (it == id_to_index.end()) return;
 
             for (uint32_t idx : it->second)
@@ -305,10 +344,9 @@ namespace vcd
             else if (line.rfind("$scope", 0) == 0)
             {
                 size_t first_space = line.find(' ');
-                size_t second_space =
-                    (first_space != std::string_view::npos)
-                        ? line.find(' ', first_space + 1)
-                        : std::string_view::npos;
+                size_t second_space = (first_space != std::string_view::npos)
+                                          ? line.find(' ', first_space + 1)
+                                          : std::string_view::npos;
                 if (second_space != std::string_view::npos)
                 {
                     std::string_view name = line.substr(second_space + 1);
@@ -319,10 +357,10 @@ namespace vcd
                     auto child = std::make_unique<ScopeNode>();
                     child->name = std::string(name);
                     child->parent = current_scope;
-                    child->full_path = current_scope->full_path.empty()
-                                           ? child->name
-                                           : current_scope->full_path + "." +
-                                                 child->name;
+                    child->full_path =
+                        current_scope->full_path.empty()
+                            ? child->name
+                            : current_scope->full_path + "." + child->name;
                     current_scope->children.push_back(std::move(child));
                     current_scope = current_scope->children.back().get();
                 }
@@ -348,13 +386,27 @@ namespace vcd
                 if (toks.size() >= 5)
                 {
                     SignalDef sig;
+                    sig.type = parseVarType(toks[1]);
                     sig.width = std::stoi(std::string(toks[2]));
                     sig.id_code = std::string(toks[3]);
                     sig.name = std::string(toks[4]);
-                    sig.full_path = current_scope->full_path.empty()
-                                        ? sig.name
-                                        : current_scope->full_path + "." +
-                                              sig.name;
+
+                    // Parse bit range [msb:lsb] if present (e.g. $var wire 8 # data [7:0] $end)
+                    if (toks.size() >= 6 && toks[5].size() > 2 &&
+                        toks[5].front() == '[' && toks[5].back() == ']')
+                    {
+                        auto inner = toks[5].substr(1, toks[5].size() - 2);
+                        auto colon = inner.find(':');
+                        if (colon != std::string_view::npos)
+                        {
+                            sig.msb = std::stoi(std::string(inner.substr(0, colon)));
+                            sig.lsb = std::stoi(std::string(inner.substr(colon + 1)));
+                        }
+                    }
+                    sig.full_path =
+                        current_scope->full_path.empty()
+                            ? sig.name
+                            : current_scope->full_path + "." + sig.name;
                     sig.index = static_cast<uint32_t>(signal_defs.size());
 
                     if (sig.width == 1)
@@ -367,7 +419,7 @@ namespace vcd
                     }
 
                     current_scope->signal_indices.push_back(sig.index);
-                    id_to_index[sig.id_code].push_back(sig.index);
+                    id_to_index[encode_id(sig.id_code)].push_back(sig.index);
                     path_to_index[sig.full_path] = sig.index;
                     signal_defs.push_back(sig);
                 }
@@ -399,8 +451,7 @@ namespace vcd
         {
             if (line[0] == '#')
             {
-                uint64_t new_time =
-                    std::stoull(std::string(line.substr(1)));
+                uint64_t new_time = std::stoull(std::string(line.substr(1)));
 
                 // --- Indexing: snapshot creation ---
                 if (phase == Phase::Indexing)
@@ -449,8 +500,7 @@ namespace vcd
                 // --- Query: check early stop ---
                 if (phase == Phase::Querying)
                 {
-                    if (!query_initial_emitted &&
-                        current_time >= query_t_begin)
+                    if (!query_initial_emitted && current_time >= query_t_begin)
                     {
                         emit_query_initial_state();
                         query_initial_emitted = true;
@@ -568,8 +618,8 @@ namespace vcd
             //   chunk_file_offset - leftover_len
             // BUT leftover_file_offset was already set correctly when the
             // leftover was saved. Verify consistency:
-            // leftover_file_offset should equal chunk_file_offset - leftover_len
-            // (This holds because we set it correctly below.)
+            // leftover_file_offset should equal chunk_file_offset -
+            // leftover_len (This holds because we set it correctly below.)
 
             uint64_t buf_file_offset = leftover_file_offset;
 
@@ -642,7 +692,7 @@ namespace vcd
 
     uint32_t VcdParser::find_signal_by_id(const std::string& id_code) const
     {
-        auto it = impl_->id_to_index.find(id_code);
+        auto it = impl_->id_to_index.find(encode_id(id_code));
         return (it != impl_->id_to_index.end() && !it->second.empty())
                    ? it->second.front()
                    : UINT32_MAX;
@@ -669,8 +719,7 @@ namespace vcd
         // Process any remaining leftover
         if (!impl_->leftover.empty())
         {
-            impl_->process_buffer(impl_->leftover,
-                                  impl_->leftover_file_offset);
+            impl_->process_buffer(impl_->leftover, impl_->leftover_file_offset);
             impl_->leftover.clear();
         }
 
@@ -682,8 +731,7 @@ namespace vcd
             snap.time = impl_->current_time;
             // Point to "end of file" - this snapshot won't be seeked to for
             // re-reading, it's just for completeness.
-            snap.file_offset =
-                impl_->leftover_file_offset;  // approximate EOF
+            snap.file_offset = impl_->leftover_file_offset;  // approximate EOF
             snap.packed_1bit_states = impl_->current_state_1bit;
             snap.multibit_states = impl_->current_state_multibit;
             impl_->snapshots.push_back(std::move(snap));
@@ -783,8 +831,7 @@ namespace vcd
         // Process any remaining leftover if the query hasn't ended early
         if (!impl_->leftover.empty() && !impl_->query_done)
         {
-            impl_->process_buffer(impl_->leftover,
-                                  impl_->leftover_file_offset);
+            impl_->process_buffer(impl_->leftover, impl_->leftover_file_offset);
         }
 
         // Ensure initial state is emitted even if data never reached
@@ -804,14 +851,12 @@ namespace vcd
             impl_->query_res_multibit.empty()
                 ? nullptr
                 : impl_->query_res_multibit.data();
-        impl_->binary_result.count_multibit =
-            impl_->query_res_multibit.size();
+        impl_->binary_result.count_multibit = impl_->query_res_multibit.size();
 
-        impl_->binary_result.string_pool = impl_->query_string_pool.empty()
-                                               ? nullptr
-                                               : impl_->query_string_pool.data();
-        impl_->binary_result.string_pool_size =
-            impl_->query_string_pool.size();
+        impl_->binary_result.string_pool =
+            impl_->query_string_pool.empty() ? nullptr
+                                             : impl_->query_string_pool.data();
+        impl_->binary_result.string_pool_size = impl_->query_string_pool.size();
 
         impl_->phase = Impl::Phase::Idle;
         return impl_->binary_result;

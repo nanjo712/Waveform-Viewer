@@ -18,10 +18,10 @@ declare global {
 
 let modulePromise: Promise<VcdParserModule> | null = null;
 
-/** Default chunk size for reading files: 4 MB */
-const INDEX_CHUNK_SIZE = 4 * 1024 * 1024;
-/** Query chunk size: 4 MB */
-const QUERY_CHUNK_SIZE = 4 * 1024 * 1024;
+/** Default chunk size for reading files: 32 MB */
+const INDEX_CHUNK_SIZE = 32 * 1024 * 1024;
+/** Query chunk size: 32 MB */
+const QUERY_CHUNK_SIZE = 32 * 1024 * 1024;
 
 /**
  * Load the Emscripten JS glue via a <script> tag (it's UMD, not ESM).

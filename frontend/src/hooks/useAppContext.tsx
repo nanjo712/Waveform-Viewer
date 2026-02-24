@@ -131,6 +131,12 @@ function reducer(state: AppState, action: Action): AppState {
         case 'FILE_LOADED': {
             const tBegin = action.metadata.timeBegin;
             const tEnd = action.metadata.timeEnd;
+            // Default view: show only the last 100 timescale units
+            const DEFAULT_VIEW_RANGE = 100;
+            const totalRange = tEnd - tBegin;
+            const viewStart = totalRange > DEFAULT_VIEW_RANGE
+                ? tEnd - DEFAULT_VIEW_RANGE
+                : tBegin;
             return {
                 ...state,
                 fileLoaded: true,
@@ -140,7 +146,7 @@ function reducer(state: AppState, action: Action): AppState {
                 hierarchy: action.hierarchy,
                 selectedSignals: [],
                 visibleRowIndices: [],
-                viewStart: tBegin,
+                viewStart,
                 viewEnd: tEnd,
                 timeBegin: tBegin,
                 timeEnd: tEnd,

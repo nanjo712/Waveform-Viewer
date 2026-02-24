@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <memory>
 #include <string>
-#include <string_view>
-#include <unordered_map>
 #include <vector>
 
 namespace vcd
@@ -166,9 +164,8 @@ namespace vcd
     //
     //   Phase 2 (Query, repeatable):
     //     plan = get_query_plan(start_time)
-    //     begin_query(start_time, end_time, signal_indices, plan.snapshot_index)
-    //     fseek(file, plan.file_offset)
-    //     while (has data) {
+    //     begin_query(start_time, end_time, signal_indices,
+    //     plan.snapshot_index) fseek(file, plan.file_offset) while (has data) {
     //       if (!push_chunk_for_query(data, size)) break;  // early-stop
     //     }
     //     result = finish_query_binary()
@@ -253,9 +250,11 @@ namespace vcd
 
         /// Feed a chunk of VCD file data starting from the offset returned
         /// by get_query_plan().
-        /// @return true  if the parser needs more data (current_time <= end_time)
+        /// @return true  if the parser needs more data (current_time <=
+        /// end_time)
         /// @return false if the query window has been fully covered; the
-        ///               caller should stop reading and call finish_query_binary()
+        ///               caller should stop reading and call
+        ///               finish_query_binary()
         bool push_chunk_for_query(const uint8_t* data, size_t size);
 
         /// Finalize the query and return results as flat binary arrays.
