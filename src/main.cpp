@@ -75,35 +75,24 @@ int main(int argc, char* argv[])
                 filepath, (unsigned long)chunk_size_bytes);
 
     int fd = ::open(filepath, O_RDONLY);
-    if (fd < 0)
+    uint64_t file_total_size = 0;
+    if (fd >= 0)
     {
-        std::fprintf(stderr, "Failed to open file: %s\n", filepath);
-        return 1;
-    }
-
-    struct stat st;
-    if (::fstat(fd, &st) != 0)
-    {
-        std::fprintf(stderr, "Failed to stat file: %s\n", filepath);
+        struct stat st;
+        if (::fstat(fd, &st) == 0)
+        {
+            file_total_size = static_cast<uint64_t>(st.st_size);
+        }
         ::close(fd);
-        return 1;
     }
-    uint64_t file_total_size = static_cast<uint64_t>(st.st_size);
-
-    void* mapped =
-        ::mmap(nullptr, file_total_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (mapped == MAP_FAILED)
-    {
-        std::fprintf(stderr, "Failed to mmap file: %s\n", filepath);
-        ::close(fd);
-        return 1;
-    }
-    // Advise the kernel we will read sequentially
-    ::madvise(mapped, file_total_size, MADV_SEQUENTIAL);
-
-    const uint8_t* file_data = static_cast<const uint8_t*>(mapped);
 
     vcd::VcdParser parser;
+    if (!parser.open_file(filepath))
+    {
+        std::fprintf(stderr, "Failed to open file via VcdParser: %s\n",
+                     filepath);
+        return 1;
+    }
 
     // =====================================================================
     // Phase 1: Indexing
@@ -113,16 +102,11 @@ int main(int argc, char* argv[])
     auto t0 = std::chrono::high_resolution_clock::now();
     parser.begin_indexing();
 
-    uint64_t global_offset = 0;
-    while (global_offset < file_total_size)
+    while (parser.index_step(chunk_size_bytes) > 0)
     {
-        size_t n = static_cast<size_t>(
-            std::min(static_cast<uint64_t>(chunk_size_bytes),
-                     file_total_size - global_offset));
-        parser.push_chunk_for_index(file_data + global_offset, n,
-                                    global_offset);
-        global_offset += n;
+        // Keep stepping until EOF
     }
+
     parser.finish_indexing();
 
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -132,14 +116,15 @@ int main(int argc, char* argv[])
     if (!parser.is_open())
     {
         std::fprintf(stderr, "Failed to parse VCD header.\n");
-        ::munmap(mapped, file_total_size);
-        ::close(fd);
         return 1;
     }
 
     std::printf("\n=== VCD File Info ===\n");
-    std::printf("File size:        %lu bytes\n",
-                (unsigned long)file_total_size);
+    if (file_total_size > 0)
+    {
+        std::printf("File size:        %lu bytes\n",
+                    (unsigned long)file_total_size);
+    }
     std::printf("Index time:       %.2f ms\n", parse_ms);
     std::printf("Date:             %s\n", parser.date().c_str());
     std::printf("Version:          %s\n", parser.version().c_str());
@@ -153,10 +138,10 @@ int main(int argc, char* argv[])
     std::printf("Index Mem Usage:  %zu bytes\n", parser.index_memory_usage());
 
     std::printf("\n=== Signal Hierarchy ===\n");
-    // if (parser.root_scope())
-    // {
-    //     print_scope(parser.root_scope(), 0, parser.signals());
-    // }
+    if (parser.root_scope())
+    {
+        print_scope(parser.root_scope(), 0, parser.signals());
+    }
 
     // =====================================================================
     // Phase 2: Querying
@@ -195,45 +180,26 @@ int main(int argc, char* argv[])
 
         // Step 1: Get the query plan (binary search for nearest snapshot)
         vcd::QueryPlan plan = parser.get_query_plan(qb);
-        std::printf("Seeking to offset %lu (snapshot time %lu, index %zu)...\n",
-                    (unsigned long)plan.file_offset,
+        std::printf("Query plan: snapshot time %lu, index %zu...\n",
                     (unsigned long)plan.snapshot_time, plan.snapshot_index);
 
-        // Step 2: The file offset tells us where to start reading in the
-        //         mmap'd region (no fseek needed with mmap)
-
-        // Step 3: Begin the query (restores snapshot state internally)
+        // Step 2: Begin the query (restores snapshot state internally and
+        // seeks)
         parser.begin_query(qb, qe, query_ids, plan.snapshot_index);
 
-        // Step 4: Walk chunks from the mmap'd region; stop when
-        //         push_chunk_for_query returns false (all data in [qb, qe]
-        //         has been collected)
-        uint64_t bytes_read_for_query = 0;
-        uint64_t query_offset = plan.file_offset;
-        while (query_offset < file_total_size)
+        // Step 3: Walk chunks
+        while (parser.query_step(chunk_size_bytes))
         {
-            size_t n = static_cast<size_t>(
-                std::min(static_cast<uint64_t>(chunk_size_bytes),
-                         file_total_size - query_offset));
-            bytes_read_for_query += n;
-            if (!parser.push_chunk_for_query(file_data + query_offset, n))
-            {
-                // Early stop: the parser has seen a timestamp beyond qe
-                break;
-            }
-            query_offset += n;
+            // Keep stepping until query ends
         }
 
-        // Step 5: Finalize and get results
-        vcd::QueryResultBinary res = parser.finish_query_binary();
+        // Step 4: Finalize and get results
+        vcd::QueryResultBinary res = parser.flush_query_binary();
 
         auto qt1 = std::chrono::high_resolution_clock::now();
         double query_us =
             std::chrono::duration<double, std::micro>(qt1 - qt0).count();
         std::printf("Query time:       %.2f us\n", query_us);
-        std::printf("Bytes read:       %lu (of %lu total)\n",
-                    (unsigned long)bytes_read_for_query,
-                    (unsigned long)file_total_size);
 
         std::printf("\nResults:\n");
         std::printf("  1-bit items: %zu\n", res.count_1bit);
@@ -261,7 +227,5 @@ int main(int argc, char* argv[])
         }
     }
 
-    ::munmap(mapped, file_total_size);
-    ::close(fd);
     return 0;
 }

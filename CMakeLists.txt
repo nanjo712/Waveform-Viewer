@@ -49,10 +49,12 @@ if(EMSCRIPTEN)
         -sMAXIMUM_MEMORY=2GB
         -sSTACK_SIZE=1MB
         -sINITIAL_MEMORY=16MB
-        -sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToUTF8','lengthBytesUTF8','HEAPU8']
+        -sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToUTF8','lengthBytesUTF8','HEAPU8','FS']
         -sENVIRONMENT=web,worker,node
         -sNO_EXIT_RUNTIME=1
-        -sFILESYSTEM=0
+        -sFORCE_FILESYSTEM=1
+        -lworkerfs.js
+        -lnodefs.js
         -sDISABLE_EXCEPTION_CATCHING=1
         -sDYNAMIC_EXECUTION=0
     )

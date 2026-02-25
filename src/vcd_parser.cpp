@@ -90,6 +90,14 @@ namespace vcd
 
     struct VcdParser::Impl
     {
+        ~Impl()
+        {
+            if (file_handle)
+            {
+                std::fclose(file_handle);
+            }
+        }
+
         enum class Phase
         {
             Idle,
@@ -97,6 +105,11 @@ namespace vcd
             Querying
         };
         Phase phase = Phase::Idle;
+
+        // --- Standard File I/O ---
+        std::FILE* file_handle = nullptr;
+        uint64_t file_total_size = 0;
+        uint64_t global_file_offset = 0;
 
         enum class ParseState
         {
@@ -741,6 +754,35 @@ namespace vcd
     }
 
     // ========================================================================
+    // File I/O Phase
+    // ========================================================================
+
+    bool VcdParser::open_file(const std::string& filepath)
+    {
+        close_file();
+        impl_->file_handle = std::fopen(filepath.c_str(), "rb");
+        if (!impl_->file_handle) return false;
+
+        // Use standard C-style fseek to seek to end and get size
+        std::fseek(impl_->file_handle, 0, SEEK_END);
+        impl_->file_total_size = std::ftell(impl_->file_handle);
+        std::fseek(impl_->file_handle, 0, SEEK_SET);
+        impl_->global_file_offset = 0;
+        return true;
+    }
+
+    void VcdParser::close_file()
+    {
+        if (impl_->file_handle)
+        {
+            std::fclose(impl_->file_handle);
+            impl_->file_handle = nullptr;
+        }
+        impl_->file_total_size = 0;
+        impl_->global_file_offset = 0;
+    }
+
+    // ========================================================================
     // Indexing Phase
     // ========================================================================
 
@@ -748,12 +790,31 @@ namespace vcd
     {
         impl_->reset_state();
         impl_->phase = Impl::Phase::Indexing;
+
+        if (impl_->file_handle)
+        {
+            std::fseek(impl_->file_handle, 0, SEEK_SET);
+            impl_->global_file_offset = 0;
+        }
     }
 
-    bool VcdParser::push_chunk_for_index(const uint8_t* data, size_t size,
-                                         uint64_t file_offset)
+    size_t VcdParser::index_step(size_t chunk_size)
     {
-        return impl_->push_chunk(data, size, file_offset);
+        if (impl_->phase != Impl::Phase::Indexing || !impl_->file_handle)
+            return 0;
+
+        std::vector<uint8_t> buffer(chunk_size);
+        size_t bytes_read =
+            std::fread(buffer.data(), 1, chunk_size, impl_->file_handle);
+
+        if (bytes_read > 0)
+        {
+            impl_->push_chunk(buffer.data(), bytes_read,
+                              impl_->global_file_offset);
+            impl_->global_file_offset += bytes_read;
+        }
+
+        return bytes_read;
     }
 
     void VcdParser::finish_indexing()
@@ -837,11 +898,26 @@ namespace vcd
             impl_->current_state_multibit = snap.multibit_states;
             impl_->current_time = snap.time;
             impl_->leftover_file_offset = snap.file_offset;
+            impl_->global_file_offset = snap.file_offset;
         }
         else
         {
             impl_->prepare_states();
             impl_->current_time = 0;
+            impl_->global_file_offset = 0;
+        }
+
+        if (impl_->file_handle)
+        {
+            // Seek to the point in the file from the snapshot
+            // On large files fseeko (fseek with offset_t) is preferred if
+            // offset > 2GB but standard fseek might wrap. Assuming fseek works
+            // or requires platform-specific like fseeko64
+#if defined(_WIN32)
+            _fseeki64(impl_->file_handle, impl_->global_file_offset, SEEK_SET);
+#else
+            fseeko(impl_->file_handle, impl_->global_file_offset, SEEK_SET);
+#endif
         }
 
         // Switch to data-section parsing (we're seeking past the header)
@@ -859,17 +935,23 @@ namespace vcd
         }
     }
 
-    bool VcdParser::push_chunk_for_query(const uint8_t* data, size_t size)
+    bool VcdParser::query_step(size_t chunk_size)
     {
-        if (impl_->phase != Impl::Phase::Querying) return false;
+        if (impl_->phase != Impl::Phase::Querying || !impl_->file_handle)
+            return false;
         if (impl_->query_done) return false;
         if (impl_->query_cancel_flag.load()) return false;
 
-        // For query chunks, the caller already seeked to the right offset.
-        // We don't need precise file offsets during queries (they are only
-        // used for snapshot creation during indexing). We pass 0 as the
-        // file_offset since we don't create snapshots during queries.
-        return impl_->push_chunk(data, size, 0);
+        std::vector<uint8_t> buffer(chunk_size);
+        size_t bytes_read =
+            std::fread(buffer.data(), 1, chunk_size, impl_->file_handle);
+
+        if (bytes_read == 0) return false;  // EOF or error
+
+        bool more_needed = impl_->push_chunk(buffer.data(), bytes_read, 0);
+        impl_->global_file_offset += bytes_read;
+
+        return more_needed;
     }
 
     QueryResultBinary VcdParser::flush_query_binary()

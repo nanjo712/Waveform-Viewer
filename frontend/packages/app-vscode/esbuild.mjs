@@ -64,20 +64,35 @@ const workerConfig = {
     resolveExtensions: ['.ts', '.js', '.json'],
 };
 
+/** @type {esbuild.BuildOptions} */
+const nodeWorkerConfig = {
+    entryPoints: [path.join(__dirname, 'src', 'nodeWorker.ts')],
+    bundle: true,
+    outfile: path.join(__dirname, 'dist', 'nodeWorker.js'),
+    format: 'cjs',
+    platform: 'node',
+    target: 'node18',
+    sourcemap: true,
+    minify: !isWatch,
+    resolveExtensions: ['.ts', '.js', '.json'],
+};
+
 async function build() {
     if (isWatch) {
-        const [extCtx, webCtx, workerCtx] = await Promise.all([
+        const [extCtx, webCtx, workerCtx, nodeWorkerCtx] = await Promise.all([
             esbuild.context(extensionConfig),
             esbuild.context(webviewConfig),
             esbuild.context(workerConfig),
+            esbuild.context(nodeWorkerConfig),
         ]);
-        await Promise.all([extCtx.watch(), webCtx.watch(), workerCtx.watch()]);
+        await Promise.all([extCtx.watch(), webCtx.watch(), workerCtx.watch(), nodeWorkerCtx.watch()]);
         console.log('[watch] Watching for changes...');
     } else {
         await Promise.all([
             esbuild.build(extensionConfig),
             esbuild.build(webviewConfig),
             esbuild.build(workerConfig),
+            esbuild.build(nodeWorkerConfig),
         ]);
         console.log('[build] Extension and webview bundles built successfully.');
     }

@@ -14,21 +14,20 @@ import type {
 export type HostToWebviewMessage =
     | { type: 'init'; wasmJsUri: string; wasmBinaryUri: string; workerUri: string }
     | { type: 'fileOpened'; fileName: string; fileSize: number }
-    | { type: 'fileSliceResponse'; requestId: number; data: ArrayBuffer }
-    | { type: 'signalToggle'; index: number }
     | { type: 'signalAdd'; indices: number[] }
     | { type: 'signalRemove'; indices: number[] }
     | { type: 'setSearch'; query: string }
-    | { type: 'toggleChisel' };
+    | { type: 'toggleChisel' }
+    | { type: 'workerMessage'; data: any };
 
 // ── Webview → Host messages ────────────────────────────────────────
 
 export type WebviewToHostMessage =
     | { type: 'ready' }
     | { type: 'wasmReady' }
-    | { type: 'fileSliceRequest'; requestId: number; offset: number; length: number }
     | { type: 'stateUpdate'; state: WebviewStateSnapshot }
-    | { type: 'error'; message: string };
+    | { type: 'error'; message: string }
+    | { type: 'workerMessage'; data: any };
 
 // ── Shared state snapshot (webview → host for tree/statusbar) ──────
 

@@ -7,8 +7,12 @@ import type { VcdParserModule } from './vcd.ts';
 export interface PlatformFile {
     readonly name: string;
     readonly size: number;
+    /** Native browser handle (used for WORKERFS mount) */
+    readonly nativeFile?: File;
+    /** Absolute local system path (used for NODEFS mount) */
+    readonly localPath?: string;
     /** Read a slice of bytes from the file at the given offset. */
-    readSlice(offset: number, length: number): Promise<ArrayBuffer>;
+    readSlice?(offset: number, length: number): Promise<ArrayBuffer>;
 }
 
 /**

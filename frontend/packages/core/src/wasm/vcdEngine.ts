@@ -13,7 +13,6 @@ import type {
     QueryResult,
     SignalQueryResult,
 } from '../types/vcd.ts';
-import type { PlatformFile } from '../types/platform.ts';
 
 const INDEX_CHUNK_SIZE = 32 * 1024 * 1024;
 const QUERY_CHUNK_SIZE = 32 * 1024 * 1024;
@@ -25,10 +24,7 @@ const VALUE_MAP = ['0', '1', 'x', 'z'] as const;
 
 export class VcdEngine {
     private parser: VcdParser | null = null;
-    private module: VcdParserModule;
-    private file: PlatformFile | null = null;
-    private chunkBufPtr = 0;
-    private chunkBufSize = 0;
+    public module: VcdParserModule;
 
     constructor(module: VcdParserModule) {
         this.module = module;
@@ -43,28 +39,31 @@ export class VcdEngine {
     }
 
     async indexFile(
-        file: PlatformFile,
+        filePath: string,
+        fileSize: number,
         onProgress?: (bytesRead: number, totalBytes: number) => void
     ): Promise<boolean> {
         this.close();
-        this.file = file;
         this.parser = new this.module.VcdParser();
-        this.ensureChunkBuffer(INDEX_CHUNK_SIZE);
+
+        if (!this.parser.open_file(filePath)) {
+            this.close();
+            return false;
+        }
+
         this.parser.begin_indexing();
 
-        const totalSize = file.size;
         let offset = 0;
 
-        while (offset < totalSize) {
-            const end = Math.min(offset + INDEX_CHUNK_SIZE, totalSize);
-            const arrayBuf = await file.readSlice(offset, end - offset);
-            const chunk = new Uint8Array(arrayBuf);
+        while (offset < fileSize) {
+            const bytesRead = this.parser.index_step(INDEX_CHUNK_SIZE);
+            if (bytesRead === 0) break; // EOF or error
 
-            this.module.HEAPU8.set(chunk, this.chunkBufPtr);
-            this.parser.push_chunk_for_index(chunk.byteLength, BigInt(offset) as unknown as number);
+            offset += bytesRead;
+            onProgress?.(offset, fileSize);
 
-            offset = end;
-            onProgress?.(offset, totalSize);
+            // Yield to event loop to allow messages (like ABORT) to process
+            await new Promise(resolve => setTimeout(resolve, 0));
         }
 
         this.parser.finish_indexing();
@@ -85,7 +84,6 @@ export class VcdEngine {
         onProgress?: (partialResult: QueryResult) => void
     ): Promise<QueryResult> {
         this.assertOpen();
-        if (!this.file) throw new Error('No file loaded');
 
         const parser = this.parser!;
         const mod = this.module;
@@ -93,7 +91,6 @@ export class VcdEngine {
         const safeTBegin = Math.floor(tBegin);
         const safeTEnd = Math.ceil(tEnd);
         const plan = parser.get_query_plan(BigInt(safeTBegin) as unknown as number);
-        const fileOffset = Number(plan.file_offset);
 
         parser.begin_query(
             BigInt(safeTBegin) as unknown as number,
@@ -102,10 +99,6 @@ export class VcdEngine {
             plan.snapshot_index,
             pixelTimeStep
         );
-
-        this.ensureChunkBuffer(QUERY_CHUNK_SIZE);
-        const totalSize = this.file.size;
-        let offset = fileOffset;
 
         const onAbort = () => parser.cancel_query();
         abortSignal?.addEventListener('abort', onAbort);
@@ -148,22 +141,16 @@ export class VcdEngine {
         };
 
         try {
-            while (offset < totalSize) {
+            while (true) {
                 if (abortSignal?.aborted) throw new Error('Query aborted');
 
-                const end = Math.min(offset + QUERY_CHUNK_SIZE, totalSize);
-                const arrayBuf = await this.file.readSlice(offset, end - offset);
-                const chunk = new Uint8Array(arrayBuf);
-
-                if (abortSignal?.aborted) throw new Error('Query aborted');
-
-                mod.HEAPU8.set(chunk, this.chunkBufPtr);
-                const keepGoing = parser.push_chunk_for_query(chunk.byteLength);
+                const keepGoing = parser.query_step(QUERY_CHUNK_SIZE);
 
                 flushToRolling();
 
                 if (!keepGoing) break;
-                offset = end;
+
+                await new Promise(resolve => setTimeout(resolve, 0));
             }
         } finally {
             abortSignal?.removeEventListener('abort', onAbort);
@@ -210,15 +197,6 @@ export class VcdEngine {
             this.parser.delete();
             this.parser = null;
         }
-        this.file = null;
-        this.chunkBufPtr = 0;
-        this.chunkBufSize = 0;
-    }
-
-    private ensureChunkBuffer(size: number): void {
-        if (this.chunkBufSize >= size) return;
-        this.chunkBufPtr = this.parser!.allocate_chunk_buffer(size);
-        this.chunkBufSize = size;
     }
 
     private decodeBinaryResult(

@@ -2,7 +2,7 @@ import type { QueryResult } from '../types/vcd.ts';
 
 export type MainToWorkerMessage =
     | { type: 'INIT'; wasmJsUri: string; wasmBinaryUri?: string }
-    | { type: 'INDEX_FILE'; fileSize: number }
+    | { type: 'INDEX_FILE'; file?: File; localPath?: string; fileSize: number }
     | { type: 'QUERY'; tBegin: number; tEnd: number; signalIndices: number[]; pixelTimeStep: number }
     | { type: 'READ_SLICE_RESPONSE'; requestId: number; buffer: ArrayBuffer }
     | { type: 'ABORT_QUERY' }

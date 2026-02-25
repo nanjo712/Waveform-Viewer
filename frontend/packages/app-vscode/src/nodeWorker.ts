@@ -1,63 +1,34 @@
-/// <reference lib="webworker" />
+import { parentPort } from 'worker_threads';
+import { VcdEngine } from '../../core/src/wasm/vcdEngine.ts';
+import type { MainToWorkerMessage, WorkerToMainMessage } from '../../core/src/worker/protocol.ts';
+import type { QueryResult } from '../../core/src/types/vcd.ts';
+import * as path from 'path';
 
-import type { VcdParserModule } from '../types/vcd.ts';
-import type { PlatformFile } from '../types/platform.ts';
-import { VcdEngine } from '../wasm/vcdEngine.ts';
-import type { MainToWorkerMessage, WorkerToMainMessage } from './protocol.ts';
-
-declare const self: DedicatedWorkerGlobalScope;
+if (!parentPort) throw new Error('Must run as a worker thread');
 
 let engine: VcdEngine | null = null;
 let abortController: AbortController | null = null;
 
-self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
-    const msg = e.data;
-
+parentPort.on('message', async (msg: MainToWorkerMessage) => {
     try {
         switch (msg.type) {
             case 'INIT': {
                 try {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    let createFn = (globalThis as any).createVcdParser;
-
-                    if (!createFn) {
-                        try {
-                            // In classic workers this will load the script and inject `createVcdParser` globally.
-                            importScripts(msg.wasmJsUri);
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            createFn = (globalThis as any).createVcdParser;
-                        } catch (e) {
-                            // In Vite dev mode, workers are loaded as ES Modules which do not support importScripts.
-                            console.warn('importScripts failed (likely an ES Module worker). Falling back to fetch+eval:', e);
-                            const response = await fetch(msg.wasmJsUri);
-                            if (!response.ok) {
-                                throw new Error(`Failed to fetch WASM glue code: ${response.statusText}`);
+                    // wasmJsUri should be an absolute local file path passed from VcdEditorProvider
+                    const createFn = require(msg.wasmJsUri);
+                    const mod = await createFn({
+                        locateFile: (file: string) => {
+                            if (file.endsWith('.wasm') && msg.wasmBinaryUri) {
+                                return msg.wasmBinaryUri;
                             }
-                            const scriptContent = await response.text();
-                            // Evaluate the script and return the factory using `new Function()`.
-                            // This guarantees execution doesn't pollute or miss global scope in strict mode.
-                            const inject = new Function(`${scriptContent}\nreturn createVcdParser;`);
-                            createFn = inject();
+                            return file;
                         }
-                    }
+                    });
 
-                    if (!createFn) {
-                        throw new Error('createVcdParser not found after loading script');
-                    }
-
-                    const opts = msg.wasmBinaryUri ? {
-                        locateFile: (path: string) => {
-                            if (path.endsWith('.wasm')) return msg.wasmBinaryUri!;
-                            return path;
-                        }
-                    } : undefined;
-
-                    const mod = await createFn(opts);
                     engine = new VcdEngine(mod);
-
-                    self.postMessage({ type: 'INIT_DONE', success: true } as WorkerToMainMessage);
+                    parentPort!.postMessage({ type: 'INIT_DONE', success: true } as WorkerToMainMessage);
                 } catch (err: any) {
-                    self.postMessage({ type: 'INIT_DONE', success: false, error: err.message } as WorkerToMainMessage);
+                    parentPort!.postMessage({ type: 'INIT_DONE', success: false, error: err.message } as WorkerToMainMessage);
                 }
                 break;
             }
@@ -73,23 +44,28 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
                 }
 
                 let filePath = '';
-                if (msg.file) {
-                    filePath = '/work/' + msg.file.name;
+                if (msg.localPath) {
+                    const dir = path.dirname(msg.localPath);
+                    const base = path.basename(msg.localPath);
+
                     try { FS.unmount('/work'); } catch (e) { }
-                    FS.mount(FS.filesystems.WORKERFS, { files: [msg.file] }, '/work');
-                } else if (msg.localPath) {
-                    filePath = msg.localPath;
+
+                    // Mount the directory containing the file via NODEFS
+                    FS.mount(FS.filesystems.NODEFS, { root: dir }, '/work');
+                    filePath = '/work/' + base;
+                } else {
+                    throw new Error('NODEFS requires a local path');
                 }
 
-                const success = await engine.indexFile(filePath, msg.fileSize, (bytesRead, totalBytes) => {
-                    self.postMessage({
+                const success = await engine.indexFile(filePath, msg.fileSize, (bytesRead: number, totalBytes: number) => {
+                    parentPort!.postMessage({
                         type: 'INDEX_PROGRESS',
                         bytesRead,
                         totalBytes
                     } as WorkerToMainMessage);
                 });
 
-                self.postMessage({
+                parentPort!.postMessage({
                     type: 'INDEX_DONE',
                     success
                 } as WorkerToMainMessage);
@@ -107,15 +83,15 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
                         msg.signalIndices,
                         abortController.signal,
                         msg.pixelTimeStep,
-                        (partialResult) => {
-                            self.postMessage({
+                        (partialResult: QueryResult) => {
+                            parentPort!.postMessage({
                                 type: 'QUERY_PROGRESS',
                                 result: partialResult
                             } as WorkerToMainMessage);
                         }
                     );
 
-                    self.postMessage({
+                    parentPort!.postMessage({
                         type: 'QUERY_DONE',
                         result
                     } as WorkerToMainMessage);
@@ -123,7 +99,7 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
                     if (err.name === 'AbortError') {
                         // Already aborted
                     } else {
-                        self.postMessage({
+                        parentPort!.postMessage({
                             type: 'QUERY_DONE',
                             result: { tBegin: msg.tBegin, tEnd: msg.tEnd, signals: [] },
                             error: err.message
@@ -143,11 +119,9 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
                 break;
             }
 
-            // READ_SLICE_RESPONSE removed
-
             case 'GET_METADATA': {
                 if (!engine) return;
-                self.postMessage({
+                parentPort!.postMessage({
                     type: 'METADATA_RESULT',
                     requestId: msg.requestId,
                     data: engine.getMetadata()
@@ -157,7 +131,7 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
 
             case 'GET_SIGNALS': {
                 if (!engine) return;
-                self.postMessage({
+                parentPort!.postMessage({
                     type: 'SIGNALS_RESULT',
                     requestId: msg.requestId,
                     data: engine.getSignals()
@@ -167,7 +141,7 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
 
             case 'GET_HIERARCHY': {
                 if (!engine) return;
-                self.postMessage({
+                parentPort!.postMessage({
                     type: 'HIERARCHY_RESULT',
                     requestId: msg.requestId,
                     data: engine.getHierarchy()
@@ -177,7 +151,7 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
 
             case 'FIND_SIGNAL': {
                 if (!engine) return;
-                self.postMessage({
+                parentPort!.postMessage({
                     type: 'FIND_SIGNAL_RESULT',
                     requestId: msg.requestId,
                     data: engine.findSignal(msg.fullPath)
@@ -193,4 +167,4 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
     } catch (err: any) {
         console.error('Worker error:', err);
     }
-};
+});

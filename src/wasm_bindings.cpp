@@ -21,41 +21,30 @@ class VcdParserWasm
     VcdParserWasm() = default;
     ~VcdParserWasm() { close(); }
 
-    void close()
-    {
-        if (chunk_buffer_)
-        {
-            std::free(chunk_buffer_);
-            chunk_buffer_ = nullptr;
-            chunk_capacity_ = 0;
-        }
-    }
+    void close() { parser_.close_file(); }
 
     bool isOpen() const { return parser_.is_open(); }
 
+    // --- File I/O ---
+    bool open_file(const std::string& filepath)
+    {
+        return parser_.open_file(filepath);
+    }
+    void close_file() { parser_.close_file(); }
+
+    // --- Indexing Phase ---
+
     // --- Chunk Memory Allocation ---
 
-    // Allocate contiguous WASM memory for the JS host to write directly into.
-    uintptr_t allocate_chunk_buffer(size_t size)
-    {
-        if (size > chunk_capacity_)
-        {
-            if (chunk_buffer_) std::free(chunk_buffer_);
-            chunk_buffer_ = static_cast<uint8_t*>(std::malloc(size + 1));
-            chunk_capacity_ = size;
-        }
-        return reinterpret_cast<uintptr_t>(chunk_buffer_);
-    }
+    // Removed allocate_chunk_buffer
 
     // --- Indexing Phase ---
 
     void begin_indexing() { parser_.begin_indexing(); }
 
-    bool push_chunk_for_index(size_t size, uint64_t global_file_offset)
+    size_t index_step(size_t chunk_size)
     {
-        if (!chunk_buffer_ || size > chunk_capacity_) return false;
-        return parser_.push_chunk_for_index(chunk_buffer_, size,
-                                            global_file_offset);
+        return parser_.index_step(chunk_size);
     }
 
     void finish_indexing() { parser_.finish_indexing(); }
@@ -84,10 +73,9 @@ class VcdParserWasm
                             pixel_time_step);
     }
 
-    bool push_chunk_for_query(size_t size)
+    bool query_step(size_t chunk_size)
     {
-        if (!chunk_buffer_ || size > chunk_capacity_) return false;
-        return parser_.push_chunk_for_query(chunk_buffer_, size);
+        return parser_.query_step(chunk_size);
     }
 
     void cancel_query() { parser_.cancel_query(); }
@@ -197,8 +185,6 @@ class VcdParserWasm
 
    private:
     vcd::VcdParser parser_;
-    uint8_t* chunk_buffer_ = nullptr;
-    size_t chunk_capacity_ = 0;
 
     // --- Helpers ---
     static const char* varTypeStr(vcd::VarType t)
@@ -276,16 +262,16 @@ EMSCRIPTEN_BINDINGS(vcd_parser_wasm)
         .function("close", &VcdParserWasm::close)
         .function("isOpen", &VcdParserWasm::isOpen)
 
-        .function("allocate_chunk_buffer",
-                  &VcdParserWasm::allocate_chunk_buffer)
+        .function("open_file", &VcdParserWasm::open_file)
+        .function("close_file", &VcdParserWasm::close_file)
 
         .function("begin_indexing", &VcdParserWasm::begin_indexing)
-        .function("push_chunk_for_index", &VcdParserWasm::push_chunk_for_index)
+        .function("index_step", &VcdParserWasm::index_step)
         .function("finish_indexing", &VcdParserWasm::finish_indexing)
 
         .function("get_query_plan", &VcdParserWasm::get_query_plan)
         .function("begin_query", &VcdParserWasm::begin_query)
-        .function("push_chunk_for_query", &VcdParserWasm::push_chunk_for_query)
+        .function("query_step", &VcdParserWasm::query_step)
         .function("cancel_query", &VcdParserWasm::cancel_query)
         .function("flush_query_binary", &VcdParserWasm::flush_query_binary)
 

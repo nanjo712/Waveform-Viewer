@@ -89,6 +89,8 @@ export class VcdServiceClient {
 
             this.worker!.postMessage({
                 type: 'INDEX_FILE',
+                file: file.nativeFile,
+                localPath: file.localPath,
                 fileSize: file.size
             } as MainToWorkerMessage);
         });
@@ -284,29 +286,7 @@ export class VcdServiceClient {
                 this.cleanupQueryCallbacks();
                 break;
 
-            case 'READ_SLICE_REQUEST':
-                if (this.file) {
-                    try {
-                        const buffer = await this.file.readSlice(msg.offset, msg.length);
-                        // Transfer the ArrayBuffer back to the worker (zero-copy)
-                        this.worker!.postMessage({
-                            type: 'READ_SLICE_RESPONSE',
-                            requestId: msg.requestId,
-                            buffer
-                        } as MainToWorkerMessage, [buffer]);
-                    } catch (err: any) {
-                        console.error('Failed to read slice:', err);
-                        // Just send an empty buffer on error to unblock worker
-                        // It will fail gracefully inside WASM
-                        const emptyBuffer = new ArrayBuffer(0);
-                        this.worker!.postMessage({
-                            type: 'READ_SLICE_RESPONSE',
-                            requestId: msg.requestId,
-                            buffer: emptyBuffer
-                        } as MainToWorkerMessage, [emptyBuffer]);
-                    }
-                }
-                break;
+            // READ_SLICE_REQUEST handler removed
 
             case 'METADATA_RESULT':
             case 'SIGNALS_RESULT':

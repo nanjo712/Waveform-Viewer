@@ -9,6 +9,7 @@
  */
 
 import * as vscode from 'vscode';
+import { Worker } from 'worker_threads';
 import type {
     HostToWebviewMessage,
     WebviewToHostMessage,
@@ -27,6 +28,8 @@ export class VcdEditorProvider implements vscode.CustomReadonlyEditorProvider {
     /** Pending file open info, deferred until WASM is ready */
     private _pendingFileUri: vscode.Uri | null = null;
     private _pendingWebview: vscode.Webview | null = null;
+    /** The Node.js WebAssembly host worker */
+    private _nodeWorker: Worker | null = null;
 
     private readonly _onDidChangeState = new vscode.EventEmitter<WebviewStateSnapshot>();
     public readonly onDidChangeState = this._onDidChangeState.event;
@@ -75,12 +78,26 @@ export class VcdEditorProvider implements vscode.CustomReadonlyEditorProvider {
             []
         );
 
+        // Start Node worker
+        const nodeWorkerUri = vscode.Uri.joinPath(this.extensionUri, 'dist', 'nodeWorker.js');
+        this._nodeWorker = new Worker(nodeWorkerUri.fsPath);
+
+        this._nodeWorker.on('message', (msg: any) => {
+            this.postMessage({ type: 'workerMessage', data: msg });
+        });
+
+        this._nodeWorker.on('error', (err: any) => {
+            console.error('Node worker error:', err);
+        });
+
         // Clean up on close
         webviewPanel.onDidDispose(() => {
             if (this._activeWebview === webviewPanel) {
                 this._activeWebview = null;
                 this._fileUri = null;
                 this._stateSnapshot = null;
+                this._nodeWorker?.terminate();
+                this._nodeWorker = null;
             }
         });
     }
@@ -147,22 +164,17 @@ export class VcdEditorProvider implements vscode.CustomReadonlyEditorProvider {
                 break;
             }
 
-            case 'fileSliceRequest': {
-                try {
-                    const data = await vscode.workspace.fs.readFile(fileUri);
-                    const slice = data.buffer.slice(
-                        msg.offset,
-                        msg.offset + msg.length
-                    ) as ArrayBuffer;
-                    const response: HostToWebviewMessage = {
-                        type: 'fileSliceResponse',
-                        requestId: msg.requestId,
-                        data: slice,
-                    };
-                    webview.postMessage(response);
-                } catch (err) {
-                    console.error('Failed to read file slice:', err);
+            case 'workerMessage': {
+                if (msg.data.type === 'INIT') {
+                    // Update INIT URIs to use Node.js absolute local paths rather than webview virtual URIs
+                    msg.data.wasmJsUri = vscode.Uri.joinPath(this.extensionUri, 'media', 'wasm', 'vcd_parser.js').fsPath;
+                    msg.data.wasmBinaryUri = vscode.Uri.joinPath(this.extensionUri, 'media', 'wasm', 'vcd_parser.wasm').fsPath;
+                } else if (msg.data.type === 'INDEX_FILE') {
+                    // Inject real path for NODEFS mount functionality
+                    msg.data.localPath = fileUri.fsPath;
                 }
+
+                this._nodeWorker?.postMessage(msg.data);
                 break;
             }
 

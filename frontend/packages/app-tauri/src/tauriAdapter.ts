@@ -22,6 +22,7 @@ function wrapBrowserFile(file: File): PlatformFile {
     return {
         name: file.name,
         size: file.size,
+        nativeFile: file,
         readSlice(offset: number, length: number): Promise<ArrayBuffer> {
             const blob = file.slice(offset, offset + length);
             return blob.arrayBuffer();

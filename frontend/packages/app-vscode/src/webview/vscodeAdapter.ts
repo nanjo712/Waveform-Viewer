@@ -40,15 +40,7 @@ declare global {
     var createVcdParser: CreateVcdParser | undefined;
 }
 
-// ── Pending file slice requests ────────────────────────────────────
-
-let nextRequestId = 1;
-const pendingSliceRequests = new Map<number, {
-    resolve: (data: ArrayBuffer) => void;
-    reject: (err: Error) => void;
-}>();
-
-// ── VSCode PlatformFile implementation (message-passing I/O) ───────
+// ── VSCode PlatformFile implementation (stubbed) ───────────────────
 
 class VscodePlatformFile implements PlatformFile {
     readonly name: string;
@@ -57,23 +49,6 @@ class VscodePlatformFile implements PlatformFile {
     constructor(name: string, size: number) {
         this.name = name;
         this.size = size;
-    }
-
-    readSlice(offset: number, length: number): Promise<ArrayBuffer> {
-        return new Promise((resolve, reject) => {
-            if (!vscode) {
-                reject(new Error('VSCode API not available'));
-                return;
-            }
-            const requestId = nextRequestId++;
-            pendingSliceRequests.set(requestId, { resolve, reject });
-            vscode.postMessage({
-                type: 'fileSliceRequest',
-                requestId,
-                offset,
-                length,
-            });
-        });
     }
 }
 
@@ -97,15 +72,8 @@ export function onHostMessage(handler: MessageHandler): () => void {
 window.addEventListener('message', (event: MessageEvent<HostToWebviewMessage>) => {
     const msg = event.data;
 
-    // Handle file slice responses internally
-    if (msg.type === 'fileSliceResponse') {
-        const pending = pendingSliceRequests.get(msg.requestId);
-        if (pending) {
-            pendingSliceRequests.delete(msg.requestId);
-            pending.resolve(msg.data);
-        }
-        return;
-    }
+    // Handle responses meant for the proxy worker
+    // (Handled by VscodeProxyWorker.onHostMessage)
 
     // Forward all other messages to registered handlers
     for (const handler of messageHandlers) {
@@ -133,16 +101,39 @@ export function postToHost(msg: WebviewToHostMessage): void {
     vscode?.postMessage(msg);
 }
 
+class VscodeProxyWorker implements Worker {
+    onmessage: ((this: Worker, ev: MessageEvent) => any) | null = null;
+    onmessageerror: ((this: Worker, ev: MessageEvent) => any) | null = null;
+    onerror: ((this: AbstractWorker, ev: ErrorEvent) => any) | null = null;
+
+    constructor() {
+        onHostMessage((msg) => {
+            if (msg.type === 'workerMessage') {
+                if (this.onmessage) {
+                    this.onmessage(new MessageEvent('message', { data: msg.data }));
+                }
+            }
+        });
+    }
+
+    postMessage(message: any, options?: any): void {
+        vscode?.postMessage({
+            type: 'workerMessage',
+            data: message
+        });
+    }
+
+    terminate(): void { }
+    addEventListener(): void { }
+    removeEventListener(): void { }
+    dispatchEvent(): boolean { return true; }
+}
+
 export class VscodePlatformAdapter implements PlatformAdapter {
     readonly platformName = 'vscode' as const;
 
     createWorker(): Worker {
-        if (!wasmConfig || !wasmConfig.workerUri) {
-            throw new Error('Worker URI not received from extension host');
-        }
-        // In VSCode Webview, we load the worker script via the webview URI
-        // provided by the extension host.
-        return new Worker(wasmConfig.workerUri);
+        return new VscodeProxyWorker();
     }
 
     getWasmConfig(): { jsUri: string; binaryUri?: string } {

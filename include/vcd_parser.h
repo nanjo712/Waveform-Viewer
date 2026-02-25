@@ -213,18 +213,18 @@ namespace vcd
 
         // --- Indexing Phase ---
 
+        /// Open a VCD file using standard fopen
+        bool open_file(const std::string& filepath);
+
+        /// Close the currently opened file
+        void close_file();
+
         /// Start indexing phase. Resets all internal state.
         void begin_indexing();
 
-        /// Push a chunk of raw VCD file bytes for indexing.
-        /// @param data          Pointer to raw bytes
-        /// @param size          Number of bytes in this chunk
-        /// @param file_offset   The absolute byte offset in the original file
-        ///                      where this chunk begins (used for snapshot
-        ///                      offset tracking).
-        /// @return true on success
-        bool push_chunk_for_index(const uint8_t* data, size_t size,
-                                  uint64_t file_offset);
+        /// Repeatedly call to read and process chunks of the file.
+        /// @return Number of bytes read in this step (0 means EOF or error)
+        size_t index_step(size_t chunk_size);
 
         /// Finalize indexing. Creates a final snapshot if needed.
         void finish_indexing();
@@ -250,14 +250,10 @@ namespace vcd
                          const std::vector<uint32_t>& signal_indices,
                          size_t snapshot_index, float pixel_time_step = -1.0f);
 
-        /// Feed a chunk of VCD file data starting from the offset returned
-        /// by get_query_plan().
-        /// @return true  if the parser needs more data (current_time <=
-        /// end_time)
-        /// @return false if the query window has been fully covered; the
-        ///               caller should stop reading and call
-        ///               flush_query_binary()
-        bool push_chunk_for_query(const uint8_t* data, size_t size);
+        /// Step-based query execution for non-blocking iteration.
+        /// @return true if the query is still ongoing (needs more steps)
+        /// @return false if the query window has been fully covered or EOF reached
+        bool query_step(size_t chunk_size);
 
         /// Extract the query results accumulated so far as flat binary arrays,
         /// and clear the internal result buffers for the next chunk (streaming
