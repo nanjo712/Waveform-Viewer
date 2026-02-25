@@ -26,7 +26,29 @@ else
 endif
 
 .PHONY: all wasm native web tauri vsix dev clean help \
-       vscode
+       vscode release
+
+release:
+	@if [ -z "$(V)" ]; then echo "Error: V is not set. Use: make release V=0.x.y"; exit 1; fi
+	@echo ">>> Bumping version to v$(V)..."
+	@# Update Frontend packages
+	@sed -i '0,/"version": "[^"]*"/s//"version": "$(V)"/' frontend/package.json
+	@find frontend/packages -name package.json -maxdepth 2 -exec sed -i '0,/"version": "[^"]*"/s//"version": "$(V)"/' {} +
+	@# Update Tauri configuration
+	@sed -i '0,/"version": "[^"]*"/s//"version": "$(V)"/' src-tauri/tauri.conf.json
+	@sed -i '0,/^version = "[^"]*"/s//version = "$(V)"/' src-tauri/Cargo.toml
+	@# Sync lock files
+	@echo ">>> Updating lock files..."
+	@cd $(FRONTEND) && npm install
+	@cd src-tauri && cargo fetch
+	@# Git operations
+	@echo ">>> Committing and tagging..."
+	@git add .
+	@git commit -m "chore: bump version to v$(V)"
+	@git tag v$(V)
+	@echo ">>> Pushing to origin..."
+	@git push origin main
+	@git push origin v$(V)
 
 help:
 	@echo "Usage:"
