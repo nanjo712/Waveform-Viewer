@@ -40,7 +40,7 @@ export declare class VcdService {
     /**
      * Query waveform data for a time range and set of signal indices.
      */
-    query(tBegin: number, tEnd: number, signalIndices: number[], abortSignal?: AbortSignal): Promise<QueryResult>;
+    query(tBegin: number, tEnd: number, signalIndices: number[], abortSignal?: AbortSignal, pixelTimeStep?: number, onProgress?: (partialResult: QueryResult) => void): Promise<QueryResult>;
     getMetadata(): VcdMetadata;
     getSignals(): SignalDef[];
     getHierarchy(): ScopeNode;

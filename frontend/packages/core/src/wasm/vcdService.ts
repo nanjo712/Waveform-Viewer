@@ -133,7 +133,9 @@ export class VcdService {
         tBegin: number,
         tEnd: number,
         signalIndices: number[],
-        abortSignal?: AbortSignal
+        abortSignal?: AbortSignal,
+        pixelTimeStep = -1.0,
+        onProgress?: (partialResult: QueryResult) => void
     ): Promise<QueryResult> {
         this.assertOpen();
         if (!this.file || !this.module) {
@@ -141,13 +143,15 @@ export class VcdService {
         }
 
         // Check cache for a superset range with the exact same signals
+        // Also check if LOD requirements basically match (or if it's disabled)
         const sigDesc = signalIndices.join(',');
         for (const [key, cached] of this.queryCache.entries()) {
-            const [cSigDesc] = key.split('|');
-            if (cSigDesc === sigDesc && cached.tBegin <= tBegin && cached.tEnd >= tEnd) {
+            const [cSigDesc, cLOD] = key.split('|');
+            if (cSigDesc === sigDesc && cLOD === pixelTimeStep.toString() && cached.tBegin <= tBegin && cached.tEnd >= tEnd) {
                 // Move to end (LRU)
                 this.queryCache.delete(key);
                 this.queryCache.set(key, cached);
+                if (onProgress) onProgress(cached);
                 return cached;
             }
         }
@@ -168,7 +172,8 @@ export class VcdService {
             BigInt(safeTBegin) as unknown as number,
             BigInt(safeTEnd) as unknown as number,
             JSON.stringify(signalIndices),
-            plan.snapshot_index
+            plan.snapshot_index,
+            pixelTimeStep
         );
 
         // Step 3: Stream chunks from the file starting at plan.file_offset
@@ -181,6 +186,52 @@ export class VcdService {
             parser.cancel_query();
         };
         abortSignal?.addEventListener('abort', onAbort);
+
+        // Rolling container for streaming outputs
+        const rollingResult: QueryResult = {
+            tBegin,
+            tEnd,
+            signals: signalIndices.map(idx => ({
+                index: idx,
+                name: '', // Decoded below
+                initialValue: 'x',
+                transitions: []
+            }))
+        };
+        let isFirstSlice = true;
+
+        const flushToRolling = () => {
+            const rawResult = parser.flush_query_binary();
+            const slice = this.decodeBinaryResult(rawResult, mod, tBegin, tEnd, signalIndices);
+
+            let hasNewData = false;
+            for (let i = 0; i < slice.signals.length; i++) {
+                const s = slice.signals[i];
+                const r = rollingResult.signals[i];
+
+                if (isFirstSlice) {
+                    r.name = s.name;
+                    r.initialValue = s.initialValue;
+                }
+
+                if (s.transitions.length > 0) {
+                    r.transitions.push(...s.transitions);
+                    hasNewData = true;
+                }
+            }
+            isFirstSlice = false;
+
+            if (hasNewData && onProgress) {
+                // Deep copy so React identifies it as new state
+                onProgress({
+                    ...rollingResult,
+                    signals: rollingResult.signals.map(s => ({
+                        ...s,
+                        transitions: [...s.transitions]
+                    }))
+                });
+            }
+        };
 
         try {
             while (offset < totalSize) {
@@ -204,6 +255,10 @@ export class VcdService {
                 mod.HEAPU8.set(chunk, this.chunkBufPtr);
 
                 const keepGoing = parser.push_chunk_for_query(chunk.byteLength);
+
+                // Instantly emit streaming progress
+                flushToRolling();
+
                 if (!keepGoing) {
                     // Early stop: parser has seen a timestamp beyond tEnd
                     break;
@@ -215,25 +270,18 @@ export class VcdService {
             abortSignal?.removeEventListener('abort', onAbort);
         }
 
-        // Step 4: Finalize and decode binary results
-        const rawResult = parser.finish_query_binary();
-        const result = this.decodeBinaryResult(
-            rawResult,
-            mod,
-            tBegin,
-            tEnd,
-            signalIndices
-        );
+        // Step 4: Final flush in case anything left over from the break condition
+        flushToRolling();
 
-        // Cache the result
-        const newCacheKey = `${sigDesc}|${tBegin}|${tEnd}`;
-        this.queryCache.set(newCacheKey, result);
+        // Cache the full result
+        const newCacheKey = `${sigDesc}|${pixelTimeStep}|${tBegin}|${tEnd}`;
+        this.queryCache.set(newCacheKey, rollingResult);
         if (this.queryCache.size > this.MAX_CACHE_SIZE) {
             const firstKey = this.queryCache.keys().next().value;
             if (firstKey) this.queryCache.delete(firstKey);
         }
 
-        return result;
+        return rollingResult;
     }
 
     // ================================================================

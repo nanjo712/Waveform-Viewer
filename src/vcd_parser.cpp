@@ -150,6 +150,10 @@ namespace vcd
         bool query_done = false;  // set when current_time > query_t_end
         std::atomic<bool> query_cancel_flag{false};
 
+        // --- LOD (Downsampling) State ---
+        float pixel_time_step = -1.0f;
+        std::unordered_map<uint32_t, uint64_t> last_emitted_time;
+
         std::vector<Transition1Bit> query_res_1bit;
         std::vector<TransitionMultiBit> query_res_multibit;
         std::string query_string_pool;
@@ -184,6 +188,8 @@ namespace vcd
             last_snapshot_file_offset = 0;
             past_first_snapshot = false;
             header_done = false;
+            pixel_time_step = -1.0f;
+            last_emitted_time.clear();
         }
 
         static std::string_view trim(std::string_view sv)
@@ -250,16 +256,46 @@ namespace vcd
             for (uint32_t idx : it->second)
             {
                 auto& sig = signal_defs[idx];
+                bool is_queried = is_signal_queried[idx];
+
+                if (emit && is_queried && pixel_time_step > 0.0f)
+                {
+                    auto last_it = last_emitted_time.find(idx);
+                    if (last_it != last_emitted_time.end())
+                    {
+                        if ((current_time - last_it->second) <
+                            static_cast<uint64_t>(pixel_time_step))
+                        {
+                            // Suppress this transition because it's too close
+                            // to the last one Update internal state but do not
+                            // emit
+                            if (sig.width == 1 && is_1bit)
+                            {
+                                set_1bit_state(current_state_1bit,
+                                               sig.bit_index,
+                                               char_to_val2b(val_tok[0]));
+                            }
+                            else if (sig.width > 1)
+                            {
+                                current_state_multibit[sig.str_index] =
+                                    std::string(val_tok);
+                            }
+                            continue;
+                        }
+                    }
+                }
 
                 if (sig.width == 1 && is_1bit)
                 {
                     uint8_t v = char_to_val2b(val_tok[0]);
                     set_1bit_state(current_state_1bit, sig.bit_index, v);
 
-                    if (emit && is_signal_queried[idx])
+                    if (emit && is_queried)
                     {
                         query_res_1bit.push_back(
                             {current_time, idx, v, {0, 0, 0}});
+                        if (pixel_time_step > 0.0f)
+                            last_emitted_time[idx] = current_time;
                     }
                 }
                 else if (sig.width > 1)
@@ -267,7 +303,7 @@ namespace vcd
                     current_state_multibit[sig.str_index] =
                         std::string(val_tok);
 
-                    if (emit && is_signal_queried[idx])
+                    if (emit && is_queried)
                     {
                         uint32_t offset =
                             static_cast<uint32_t>(query_string_pool.size());
@@ -275,6 +311,8 @@ namespace vcd
                         query_res_multibit.push_back(
                             {current_time, idx, offset,
                              static_cast<uint32_t>(val_tok.size()), 0});
+                        if (pixel_time_step > 0.0f)
+                            last_emitted_time[idx] = current_time;
                     }
                 }
             }
@@ -612,7 +650,6 @@ namespace vcd
                         uint64_t chunk_file_offset)
         {
             // Concatenate leftover + new data
-            size_t leftover_len = leftover.size();
             leftover.append(reinterpret_cast<const char*>(data), size);
 
             // The absolute file offset of leftover[0] is
@@ -775,7 +812,7 @@ namespace vcd
 
     void VcdParser::begin_query(uint64_t start_time, uint64_t end_time,
                                 const std::vector<uint32_t>& signal_indices,
-                                size_t snapshot_index)
+                                size_t snapshot_index, float pixel_step)
     {
         impl_->phase = Impl::Phase::Querying;
         impl_->query_t_begin = start_time;
@@ -789,6 +826,8 @@ namespace vcd
         impl_->leftover.clear();
         impl_->leftover_file_offset = 0;
         impl_->query_cancel_flag.store(false);
+        impl_->pixel_time_step = pixel_step;
+        impl_->last_emitted_time.clear();
 
         // Restore state from the specified snapshot
         if (snapshot_index < impl_->snapshots.size())
@@ -833,7 +872,7 @@ namespace vcd
         return impl_->push_chunk(data, size, 0);
     }
 
-    QueryResultBinary VcdParser::finish_query_binary()
+    QueryResultBinary VcdParser::flush_query_binary()
     {
         // Process any remaining leftover if the query hasn't ended early
         if (!impl_->leftover.empty() && !impl_->query_done)
@@ -847,6 +886,15 @@ namespace vcd
         {
             impl_->emit_query_initial_state();
             impl_->query_initial_emitted = true;
+            // Also mark the last emitted time so LOD does not crush the
+            // immediate next event
+            if (impl_->pixel_time_step > 0.0f)
+            {
+                for (uint32_t idx : impl_->query_signal_indices)
+                {
+                    impl_->last_emitted_time[idx] = impl_->query_t_begin;
+                }
+            }
         }
 
         impl_->binary_result.transitions_1bit =
@@ -865,7 +913,13 @@ namespace vcd
                                              : impl_->query_string_pool.data();
         impl_->binary_result.string_pool_size = impl_->query_string_pool.size();
 
-        impl_->phase = Impl::Phase::Idle;
+        // Clear vectors after attaching to result context
+        // So they are fresh for the next chunk while these flat outputs
+        // sit within WASM block. Note: std::vector::data() is guaranteed
+        // contiguous but we shouldn't actually clear right now since the caller
+        // reads the memory address of the vector's buffer.
+        // We will clear it natively on the NEXT wrapper call or loop iter.
+
         return impl_->binary_result;
     }
 

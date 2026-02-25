@@ -74,12 +74,14 @@ class VcdParserWasm
     }
 
     void begin_query(uint64_t start_time, uint64_t end_time,
-                     const std::string& indicesJSON, uint32_t snapshot_index)
+                     const std::string& indicesJSON, uint32_t snapshot_index,
+                     float pixel_time_step)
     {
         auto parsed = json::parse(indicesJSON);
         std::vector<uint32_t> indices = parsed.get<std::vector<uint32_t>>();
         parser_.begin_query(start_time, end_time, indices,
-                            static_cast<size_t>(snapshot_index));
+                            static_cast<size_t>(snapshot_index),
+                            pixel_time_step);
     }
 
     bool push_chunk_for_query(size_t size)
@@ -91,9 +93,9 @@ class VcdParserWasm
     void cancel_query() { parser_.cancel_query(); }
 
     // Return mapping addresses instead of JSON serialization
-    emscripten::val finish_query_binary()
+    emscripten::val flush_query_binary()
     {
-        auto res = parser_.finish_query_binary();
+        auto res = parser_.flush_query_binary();
         auto obj = emscripten::val::object();
 
         obj.set("ptr1Bit",
@@ -285,7 +287,7 @@ EMSCRIPTEN_BINDINGS(vcd_parser_wasm)
         .function("begin_query", &VcdParserWasm::begin_query)
         .function("push_chunk_for_query", &VcdParserWasm::push_chunk_for_query)
         .function("cancel_query", &VcdParserWasm::cancel_query)
-        .function("finish_query_binary", &VcdParserWasm::finish_query_binary)
+        .function("flush_query_binary", &VcdParserWasm::flush_query_binary)
 
         .function("getDate", &VcdParserWasm::getDate)
         .function("getVersion", &VcdParserWasm::getVersion)

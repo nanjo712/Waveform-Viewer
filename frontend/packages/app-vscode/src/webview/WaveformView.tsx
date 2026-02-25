@@ -5,12 +5,15 @@
  * no status bar — those are native VSCode UI elements).
  */
 
-import { WaveformCanvas } from '@waveform-viewer/react-ui';
+import { WaveformCanvas, Sidebar } from '@waveform-viewer/react-ui';
 
 export function WaveformView() {
     return (
         <div className="vscode-waveform-root">
-            <WaveformCanvas />
+            <div className="main-content">
+                <Sidebar />
+                <WaveformCanvas />
+            </div>
         </div>
     );
 }

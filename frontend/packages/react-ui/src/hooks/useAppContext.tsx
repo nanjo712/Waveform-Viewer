@@ -137,8 +137,25 @@ export function AppProvider({ adapter, vcdService, children }: AppProviderProps)
 
         const executeQuery = async () => {
             lastQueryTimeRef.current = Date.now();
+
+            // Heuristic for LOD: assume the canvas is roughly window.innerWidth in width.
+            // A more exact way would be reading real canvas bounds, but this is a solid approximation.
+            const canvasWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
+            const pixelTimeStep = w / canvasWidth;
+
             try {
-                const result = await vcdService.query(reqStart, reqEnd, state.visibleRowIndices, ac.signal);
+                const result = await vcdService.query(
+                    reqStart,
+                    reqEnd,
+                    state.visibleRowIndices,
+                    ac.signal,
+                    pixelTimeStep,
+                    (partialResult) => {
+                        // PROGRESSIVE RENDERING: Streaming partial updates directly to canvas
+                        dispatch({ type: 'SET_QUERY_RESULT', result: partialResult });
+                    }
+                );
+
                 if (ac.signal.aborted) return;
 
                 currentDataRangeRef.current = { start: reqStart, end: reqEnd, signals: sigDesc };

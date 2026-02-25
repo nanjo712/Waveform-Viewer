@@ -7,7 +7,6 @@
 
 import * as vscode from 'vscode';
 import { VcdEditorProvider } from './VcdEditorProvider.ts';
-import { SignalTreeProvider } from './SignalTreeProvider.ts';
 import { StatusBarManager } from './StatusBarManager.ts';
 import type { HostToWebviewMessage } from './protocol.ts';
 
@@ -26,13 +25,6 @@ export function activate(context: vscode.ExtensionContext) {
         )
     );
 
-    // Signal tree view
-    const treeProvider = new SignalTreeProvider();
-    const treeView = vscode.window.createTreeView('waveformViewer.signalTree', {
-        treeDataProvider: treeProvider,
-        showCollapseAll: true,
-    });
-    context.subscriptions.push(treeView);
 
     // Status bar
     const statusBar = new StatusBarManager();
@@ -40,7 +32,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Listen for state updates from webview
     editorProvider.onDidChangeState((snapshot) => {
-        treeProvider.updateState(snapshot);
         statusBar.updateState(snapshot);
     });
 
@@ -100,36 +91,7 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Handle tree view checkbox clicks (signal toggle)
-    treeView.onDidChangeCheckboxState((e) => {
-        for (const [item, checked] of e.items) {
-            if (item.signalIndex !== undefined) {
-                if (checked === vscode.TreeItemCheckboxState.Checked) {
-                    editorProvider.postMessage({
-                        type: 'signalAdd',
-                        indices: [item.signalIndex],
-                    });
-                } else {
-                    editorProvider.postMessage({
-                        type: 'signalRemove',
-                        indices: [item.signalIndex],
-                    });
-                }
-            } else if (item.scopeIndices) {
-                if (checked === vscode.TreeItemCheckboxState.Checked) {
-                    editorProvider.postMessage({
-                        type: 'signalAdd',
-                        indices: item.scopeIndices,
-                    });
-                } else {
-                    editorProvider.postMessage({
-                        type: 'signalRemove',
-                        indices: item.scopeIndices,
-                    });
-                }
-            }
-        }
-    });
+
 }
 
 export function deactivate() {

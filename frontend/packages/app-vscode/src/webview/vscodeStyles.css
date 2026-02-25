@@ -52,13 +52,14 @@
     --font-size-xs: 11px;
 
     /* Layout — no sidebar in webview, no titlebar */
-    --sidebar-width: 0px;
     --titlebar-height: 0px;
 }
 
 /* ── VSCode webview root layout ──────────────────────────────────── */
 
-html, body, #root {
+html,
+body,
+#root {
     width: 100%;
     height: 100%;
     margin: 0;
@@ -79,7 +80,6 @@ html, body, #root {
 
 /* ── Hide elements that are handled natively by VSCode ───────────── */
 
-.sidebar,
 .titlebar,
 .statusbar {
     display: none !important;

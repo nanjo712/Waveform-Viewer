@@ -70,10 +70,10 @@ export interface VcdParser {
     push_chunk_for_index(size: number, global_file_offset: number): boolean;
     finish_indexing(): void;
     get_query_plan(start_time: number): QueryPlan;
-    begin_query(start_time: number, end_time: number, indicesJSON: string, snapshot_index: number): void;
+    begin_query(start_time: number, end_time: number, indicesJSON: string, snapshot_index: number, pixel_time_step: number): void;
     push_chunk_for_query(size: number): boolean;
     cancel_query(): void;
-    finish_query_binary(): QueryResultBinaryRaw;
+    flush_query_binary(): QueryResultBinaryRaw;
     getDate(): string;
     getVersion(): string;
     getTimescaleMagnitude(): number;

@@ -1,5 +1,5 @@
 {
-    "name": "@waveform-viewer/app-vscode",
+    "name": "waveform-viewer",
     "displayName": "Waveform Viewer",
     "description": "View VCD waveform files natively in VSCode",
     "version": "0.2.0",
@@ -31,24 +31,6 @@
                 "priority": "default"
             }
         ],
-        "viewsContainers": {
-            "activitybar": [
-                {
-                    "id": "waveform-viewer",
-                    "title": "Waveform Viewer",
-                    "icon": "$(pulse)"
-                }
-            ]
-        },
-        "views": {
-            "waveform-viewer": [
-                {
-                    "id": "waveformViewer.signalTree",
-                    "name": "Signal Explorer",
-                    "type": "tree"
-                }
-            ]
-        },
         "commands": [
             {
                 "command": "waveformViewer.toggleChiselHierarchy",
@@ -75,21 +57,12 @@
                 "title": "Zoom to Fit",
                 "category": "Waveform Viewer"
             }
-        ],
-        "menus": {
-            "view/title": [
-                {
-                    "command": "waveformViewer.toggleChiselHierarchy",
-                    "when": "view == waveformViewer.signalTree",
-                    "group": "navigation"
-                }
-            ]
-        }
+        ]
     },
     "scripts": {
         "build": "node esbuild.mjs",
         "watch": "node esbuild.mjs --watch",
-        "package": "vsce package"
+        "package": "vsce package --no-dependencies"
     },
     "dependencies": {
         "@waveform-viewer/core": "*",

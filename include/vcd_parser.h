@@ -244,9 +244,11 @@ namespace vcd
         /// @param end_time        End of the query time window
         /// @param signal_indices  Indices of signals to query
         /// @param snapshot_index  Index from QueryPlan::snapshot_index
+        /// @param pixel_time_step Downsampling resolution (time/pixel). < 0
+        /// implies LOD disabled.
         void begin_query(uint64_t start_time, uint64_t end_time,
                          const std::vector<uint32_t>& signal_indices,
-                         size_t snapshot_index);
+                         size_t snapshot_index, float pixel_time_step = -1.0f);
 
         /// Feed a chunk of VCD file data starting from the offset returned
         /// by get_query_plan().
@@ -254,13 +256,15 @@ namespace vcd
         /// end_time)
         /// @return false if the query window has been fully covered; the
         ///               caller should stop reading and call
-        ///               finish_query_binary()
+        ///               flush_query_binary()
         bool push_chunk_for_query(const uint8_t* data, size_t size);
 
-        /// Finalize the query and return results as flat binary arrays.
-        /// The returned pointers are valid until the next begin_query() or
+        /// Extract the query results accumulated so far as flat binary arrays,
+        /// and clear the internal result buffers for the next chunk (streaming
+        /// mode). The returned pointers are valid until the next
+        /// push_chunk_for_query, flush_query_binary, begin_query, or
         /// destruction.
-        QueryResultBinary finish_query_binary();
+        QueryResultBinary flush_query_binary();
 
         // --- Statistics ---
         size_t snapshot_count() const;

@@ -85,11 +85,12 @@ export interface VcdParser {
         start_time: number,
         end_time: number,
         indicesJSON: string,
-        snapshot_index: number
+        snapshot_index: number,
+        pixel_time_step: number
     ): void;
     push_chunk_for_query(size: number): boolean;
     cancel_query(): void;
-    finish_query_binary(): QueryResultBinaryRaw;
+    flush_query_binary(): QueryResultBinaryRaw;
 
     /* Metadata accessors */
     getDate(): string;
