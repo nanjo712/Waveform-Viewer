@@ -46,6 +46,10 @@ export class VcdService {
     /** Platform adapter for WASM loading. */
     private adapter: PlatformAdapter;
 
+    /** LRU Cache for query results */
+    private queryCache = new Map<string, QueryResult>();
+    private readonly MAX_CACHE_SIZE = 10;
+
     constructor(adapter: PlatformAdapter) {
         this.adapter = adapter;
     }
@@ -128,11 +132,24 @@ export class VcdService {
     async query(
         tBegin: number,
         tEnd: number,
-        signalIndices: number[]
+        signalIndices: number[],
+        abortSignal?: AbortSignal
     ): Promise<QueryResult> {
         this.assertOpen();
         if (!this.file || !this.module) {
             throw new Error('No file loaded');
+        }
+
+        // Check cache for a superset range with the exact same signals
+        const sigDesc = signalIndices.join(',');
+        for (const [key, cached] of this.queryCache.entries()) {
+            const [cSigDesc] = key.split('|');
+            if (cSigDesc === sigDesc && cached.tBegin <= tBegin && cached.tEnd >= tEnd) {
+                // Move to end (LRU)
+                this.queryCache.delete(key);
+                this.queryCache.set(key, cached);
+                return cached;
+            }
         }
 
         const parser = this.parser!;
@@ -160,32 +177,63 @@ export class VcdService {
         const totalSize = this.file.size;
         let offset = fileOffset;
 
-        while (offset < totalSize) {
-            const end = Math.min(offset + QUERY_CHUNK_SIZE, totalSize);
-            const arrayBuf = await this.file.readSlice(offset, end - offset);
-            const chunk = new Uint8Array(arrayBuf);
+        const onAbort = () => {
+            parser.cancel_query();
+        };
+        abortSignal?.addEventListener('abort', onAbort);
 
-            // Copy into WASM heap
-            mod.HEAPU8.set(chunk, this.chunkBufPtr);
+        try {
+            while (offset < totalSize) {
+                if (abortSignal?.aborted) {
+                    const err = new Error('Query aborted');
+                    err.name = 'AbortError';
+                    throw err;
+                }
 
-            const keepGoing = parser.push_chunk_for_query(chunk.byteLength);
-            if (!keepGoing) {
-                // Early stop: parser has seen a timestamp beyond tEnd
-                break;
+                const end = Math.min(offset + QUERY_CHUNK_SIZE, totalSize);
+                const arrayBuf = await this.file.readSlice(offset, end - offset);
+                const chunk = new Uint8Array(arrayBuf);
+
+                if (abortSignal?.aborted) {
+                    const err = new Error('Query aborted');
+                    err.name = 'AbortError';
+                    throw err;
+                }
+
+                // Copy into WASM heap
+                mod.HEAPU8.set(chunk, this.chunkBufPtr);
+
+                const keepGoing = parser.push_chunk_for_query(chunk.byteLength);
+                if (!keepGoing) {
+                    // Early stop: parser has seen a timestamp beyond tEnd
+                    break;
+                }
+
+                offset = end;
             }
-
-            offset = end;
+        } finally {
+            abortSignal?.removeEventListener('abort', onAbort);
         }
 
         // Step 4: Finalize and decode binary results
         const rawResult = parser.finish_query_binary();
-        return this.decodeBinaryResult(
+        const result = this.decodeBinaryResult(
             rawResult,
             mod,
             tBegin,
             tEnd,
             signalIndices
         );
+
+        // Cache the result
+        const newCacheKey = `${sigDesc}|${tBegin}|${tEnd}`;
+        this.queryCache.set(newCacheKey, result);
+        if (this.queryCache.size > this.MAX_CACHE_SIZE) {
+            const firstKey = this.queryCache.keys().next().value;
+            if (firstKey) this.queryCache.delete(firstKey);
+        }
+
+        return result;
     }
 
     // ================================================================
@@ -233,6 +281,7 @@ export class VcdService {
         // Note: chunkBufPtr is owned by the WASM parser instance (freed on close)
         this.chunkBufPtr = 0;
         this.chunkBufSize = 0;
+        this.queryCache.clear();
     }
 
     // ================================================================

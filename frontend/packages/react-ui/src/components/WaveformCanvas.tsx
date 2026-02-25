@@ -42,10 +42,7 @@ function parseBitValue(val: string): number | null {
 // ── Time axis formatting ───────────────────────────────────────────
 
 function formatTime(t: number, unit: string): string {
-    if (t >= 1e9) return (t / 1e9).toFixed(2) + ' G' + unit;
-    if (t >= 1e6) return (t / 1e6).toFixed(2) + ' M' + unit;
-    if (t >= 1e3) return (t / 1e3).toFixed(2) + ' k' + unit;
-    return t.toFixed(0) + ' ' + unit;
+    return t.toLocaleString() + ' ' + unit;
 }
 
 function niceStep(range: number, maxTicks: number): number {

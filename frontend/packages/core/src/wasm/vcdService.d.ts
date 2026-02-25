@@ -21,6 +21,9 @@ export declare class VcdService {
     private chunkBufSize;
     /** Platform adapter for WASM loading. */
     private adapter;
+    /** LRU Cache for query results */
+    private queryCache;
+    private readonly MAX_CACHE_SIZE;
     constructor(adapter: PlatformAdapter);
     init(): Promise<void>;
     get isReady(): boolean;
@@ -37,7 +40,7 @@ export declare class VcdService {
     /**
      * Query waveform data for a time range and set of signal indices.
      */
-    query(tBegin: number, tEnd: number, signalIndices: number[]): Promise<QueryResult>;
+    query(tBegin: number, tEnd: number, signalIndices: number[], abortSignal?: AbortSignal): Promise<QueryResult>;
     getMetadata(): VcdMetadata;
     getSignals(): SignalDef[];
     getHierarchy(): ScopeNode;

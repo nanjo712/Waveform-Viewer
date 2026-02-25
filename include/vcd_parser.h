@@ -266,6 +266,9 @@ namespace vcd
         size_t snapshot_count() const;
         size_t index_memory_usage() const;
 
+        /// Cancel an ongoing query
+        void cancel_query();
+
        private:
         struct Impl;
         std::unique_ptr<Impl> impl_;

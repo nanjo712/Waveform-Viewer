@@ -1,6 +1,7 @@
 #include "vcd_parser.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -64,22 +65,22 @@ namespace vcd
 
     VarType parseVarType(std::string_view s)
     {
-        if (s == "wire")      return VarType::Wire;
-        if (s == "reg")       return VarType::Reg;
-        if (s == "integer")   return VarType::Integer;
-        if (s == "real")      return VarType::Real;
+        if (s == "wire") return VarType::Wire;
+        if (s == "reg") return VarType::Reg;
+        if (s == "integer") return VarType::Integer;
+        if (s == "real") return VarType::Real;
         if (s == "parameter") return VarType::Parameter;
-        if (s == "event")     return VarType::Event;
-        if (s == "supply0")   return VarType::Supply0;
-        if (s == "supply1")   return VarType::Supply1;
-        if (s == "tri")       return VarType::Tri;
-        if (s == "triand")    return VarType::TriAnd;
-        if (s == "trior")     return VarType::TriOr;
-        if (s == "trireg")    return VarType::TriReg;
-        if (s == "tri0")      return VarType::Tri0;
-        if (s == "tri1")      return VarType::Tri1;
-        if (s == "wand")      return VarType::WAnd;
-        if (s == "wor")       return VarType::WOr;
+        if (s == "event") return VarType::Event;
+        if (s == "supply0") return VarType::Supply0;
+        if (s == "supply1") return VarType::Supply1;
+        if (s == "tri") return VarType::Tri;
+        if (s == "triand") return VarType::TriAnd;
+        if (s == "trior") return VarType::TriOr;
+        if (s == "trireg") return VarType::TriReg;
+        if (s == "tri0") return VarType::Tri0;
+        if (s == "tri1") return VarType::Tri1;
+        if (s == "wand") return VarType::WAnd;
+        if (s == "wor") return VarType::WOr;
         return VarType::Unknown;
     }
 
@@ -147,6 +148,7 @@ namespace vcd
         std::vector<uint32_t> query_signal_indices;
         bool query_initial_emitted = false;
         bool query_done = false;  // set when current_time > query_t_end
+        std::atomic<bool> query_cancel_flag{false};
 
         std::vector<Transition1Bit> query_res_1bit;
         std::vector<TransitionMultiBit> query_res_multibit;
@@ -391,7 +393,8 @@ namespace vcd
                     sig.id_code = std::string(toks[3]);
                     sig.name = std::string(toks[4]);
 
-                    // Parse bit range [msb:lsb] if present (e.g. $var wire 8 # data [7:0] $end)
+                    // Parse bit range [msb:lsb] if present (e.g. $var wire 8 #
+                    // data [7:0] $end)
                     if (toks.size() >= 6 && toks[5].size() > 2 &&
                         toks[5].front() == '[' && toks[5].back() == ']')
                     {
@@ -399,8 +402,10 @@ namespace vcd
                         auto colon = inner.find(':');
                         if (colon != std::string_view::npos)
                         {
-                            sig.msb = std::stoi(std::string(inner.substr(0, colon)));
-                            sig.lsb = std::stoi(std::string(inner.substr(colon + 1)));
+                            sig.msb =
+                                std::stoi(std::string(inner.substr(0, colon)));
+                            sig.lsb =
+                                std::stoi(std::string(inner.substr(colon + 1)));
                         }
                     }
                     sig.full_path =
@@ -783,6 +788,7 @@ namespace vcd
         impl_->query_string_pool.clear();
         impl_->leftover.clear();
         impl_->leftover_file_offset = 0;
+        impl_->query_cancel_flag.store(false);
 
         // Restore state from the specified snapshot
         if (snapshot_index < impl_->snapshots.size())
@@ -818,6 +824,7 @@ namespace vcd
     {
         if (impl_->phase != Impl::Phase::Querying) return false;
         if (impl_->query_done) return false;
+        if (impl_->query_cancel_flag.load()) return false;
 
         // For query chunks, the caller already seeked to the right offset.
         // We don't need precise file offsets during queries (they are only
@@ -861,6 +868,8 @@ namespace vcd
         impl_->phase = Impl::Phase::Idle;
         return impl_->binary_result;
     }
+
+    void VcdParser::cancel_query() { impl_->query_cancel_flag.store(true); }
 
     // --- Statistics ---
     size_t VcdParser::snapshot_count() const { return impl_->snapshots.size(); }

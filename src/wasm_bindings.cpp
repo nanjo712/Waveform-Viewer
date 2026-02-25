@@ -68,7 +68,8 @@ class VcdParserWasm
         auto obj = emscripten::val::object();
         obj.set("file_offset", val(plan.file_offset));
         obj.set("snapshot_time", val(plan.snapshot_time));
-        obj.set("snapshot_index", val(static_cast<uint32_t>(plan.snapshot_index)));
+        obj.set("snapshot_index",
+                val(static_cast<uint32_t>(plan.snapshot_index)));
         return obj;
     }
 
@@ -86,6 +87,8 @@ class VcdParserWasm
         if (!chunk_buffer_ || size > chunk_capacity_) return false;
         return parser_.push_chunk_for_query(chunk_buffer_, size);
     }
+
+    void cancel_query() { parser_.cancel_query(); }
 
     // Return mapping addresses instead of JSON serialization
     emscripten::val finish_query_binary()
@@ -281,6 +284,7 @@ EMSCRIPTEN_BINDINGS(vcd_parser_wasm)
         .function("get_query_plan", &VcdParserWasm::get_query_plan)
         .function("begin_query", &VcdParserWasm::begin_query)
         .function("push_chunk_for_query", &VcdParserWasm::push_chunk_for_query)
+        .function("cancel_query", &VcdParserWasm::cancel_query)
         .function("finish_query_binary", &VcdParserWasm::finish_query_binary)
 
         .function("getDate", &VcdParserWasm::getDate)

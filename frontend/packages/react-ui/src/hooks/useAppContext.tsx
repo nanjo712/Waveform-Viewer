@@ -12,6 +12,7 @@ import {
     useReducer,
     useCallback,
     useEffect,
+    useRef,
     type ReactNode,
     type Dispatch,
 } from 'react';
@@ -83,29 +84,84 @@ export function AppProvider({ adapter, vcdService, children }: AppProviderProps)
             );
     }, [vcdService]);
 
-    // Query waveform data whenever view or visible signals change
-    const doQuery = useCallback(async () => {
-        if (
-            !vcdService.isFileLoaded ||
-            state.visibleRowIndices.length === 0
-        )
-            return;
+    // ── Query Optimization State ───────────────────────────────────────────
+    const currentDataRangeRef = useRef<{ start: number, end: number, signals: string } | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const lastQueryTimeRef = useRef<number>(0);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-        try {
-            const result = await vcdService.query(
-                state.viewStart,
-                state.viewEnd,
-                state.visibleRowIndices
-            );
-            dispatch({ type: 'SET_QUERY_RESULT', result });
-        } catch (err) {
-            console.error('Query failed:', err);
-        }
-    }, [vcdService, state.viewStart, state.viewEnd, state.visibleRowIndices]);
-
+    // Cleanup resources on unmount
     useEffect(() => {
-        doQuery();
-    }, [doQuery]);
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+            if (abortControllerRef.current) abortControllerRef.current.abort();
+        };
+    }, []);
+
+    // Query waveform data whenever view or visible signals change
+    useEffect(() => {
+        if (!state.fileLoaded || !vcdService.isFileLoaded || state.visibleRowIndices.length === 0) return;
+
+        const w = state.viewEnd - state.viewStart;
+        if (w <= 0) return;
+
+        const sigDesc = state.visibleRowIndices.join(',');
+
+        // 1. Spatial Optimization: Prefetching & Padding
+        const cache = currentDataRangeRef.current;
+        if (
+            cache &&
+            cache.signals === sigDesc &&
+            state.viewStart >= cache.start &&
+            state.viewEnd <= cache.end
+        ) {
+            // New view falls completely within our padded buffer, no Wasm query needed!
+            return;
+        }
+
+        // We need new data. Calculate padded range (1x width on each side).
+        const reqStart = Math.max(0, state.viewStart - w);
+        const reqEnd = state.viewEnd + w;
+
+        // 2 & 4. Temporal Optimization & Query Cancellation
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const ac = new AbortController();
+        abortControllerRef.current = ac;
+
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+
+        const executeQuery = async () => {
+            lastQueryTimeRef.current = Date.now();
+            try {
+                const result = await vcdService.query(reqStart, reqEnd, state.visibleRowIndices, ac.signal);
+                if (ac.signal.aborted) return;
+
+                currentDataRangeRef.current = { start: reqStart, end: reqEnd, signals: sigDesc };
+                dispatch({ type: 'SET_QUERY_RESULT', result });
+            } catch (err: unknown) {
+                if (err instanceof Error && err.name === 'AbortError') return;
+                console.error('Query failed:', err);
+            }
+        };
+
+        const now = Date.now();
+        const elapsed = now - lastQueryTimeRef.current;
+        const THROTTLE_MS = 60; // Throttling threshold
+
+        if (elapsed >= THROTTLE_MS) {
+            executeQuery();
+        } else {
+            // Debounce for trailing edge
+            timerRef.current = setTimeout(() => {
+                executeQuery();
+            }, THROTTLE_MS - Math.max(0, elapsed));
+        }
+    }, [vcdService, state.fileLoaded, state.viewStart, state.viewEnd, state.visibleRowIndices, dispatch]);
 
     return (
         <AppContext.Provider value={{ state, dispatch, vcdService, adapter }}>

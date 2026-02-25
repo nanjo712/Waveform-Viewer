@@ -72,6 +72,7 @@ export interface VcdParser {
     get_query_plan(start_time: number): QueryPlan;
     begin_query(start_time: number, end_time: number, indicesJSON: string, snapshot_index: number): void;
     push_chunk_for_query(size: number): boolean;
+    cancel_query(): void;
     finish_query_binary(): QueryResultBinaryRaw;
     getDate(): string;
     getVersion(): string;

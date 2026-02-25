@@ -88,6 +88,7 @@ export interface VcdParser {
         snapshot_index: number
     ): void;
     push_chunk_for_query(size: number): boolean;
+    cancel_query(): void;
     finish_query_binary(): QueryResultBinaryRaw;
 
     /* Metadata accessors */
