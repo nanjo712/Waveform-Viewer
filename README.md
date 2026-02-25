@@ -44,16 +44,16 @@ If you want to do secondary development or build it yourself, please follow thes
    make wasm
    ```
 
-3. **Build Frontend**:
+3. **Build Web Package**:
    ```bash
-   make frontend
+   make web
    ```
+   After the build is complete, the static web package will be stored in the `./dist` directory.
 
-4. **Generate Static Build**:
-   ```bash
-   make static
-   ```
-   After the build is complete, all artifacts will be stored in the `./dist` directory.
+4. **(Optional) Build other targets**:
+   - **Native CLI**: `make native`
+   - **Desktop App**: `make tauri`
+   - **VSCode Extension**: `make vscode` (or `make vsix` for `.vsix` package)
 
 5. **Local Development Preview**:
    ```bash
@@ -77,7 +77,7 @@ The Waveform Viewer supports custom formatters to display signal values in diffe
 
 #### Plugin Interfaces
 
-Plugins are built around two main TypeScript interfaces defined in `frontend/src/types/plugin.ts`:
+Plugins are built around two main TypeScript interfaces defined in `frontend/packages/core/src/types/plugin.ts`:
 
 ```typescript
 export interface FormatView {
@@ -185,9 +185,9 @@ Plugins can be registered in two ways:
 
 ##### 1. Built-in Core Plugins
 If you are adding a built-in plugin directly to the repository:
-1. Place your plugin file in `frontend/src/plugins/`.
-2. Import it in `frontend/src/hooks/useAppContext.tsx`.
-3. Add it to the `formatPlugins` array in the `initialState` of `useAppContext.tsx`.
+1. Place your plugin file in `frontend/packages/core/src/plugins/`.
+2. Import it in `frontend/packages/core/src/state/reducer.ts`.
+3. Add it to the `formatPlugins` array in the `initialState` of `reducer.ts`.
 
 ##### 2. Dynamically (At Runtime)
 For external plugins loaded at runtime, the application exposes a global registration method on the `window` object:

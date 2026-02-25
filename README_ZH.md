@@ -44,16 +44,16 @@ Waveform Viewer 是一个高性能的 Web 波形查看器，核心解析器采�
    make wasm
    ```
 
-3. **构建前端**:
+3. **构建 Web 部署包**:
    ```bash
-   make frontend
+   make web
    ```
+   构建完成后，Web 静态产物将存放在 `./dist` 目录下。
 
-4. **生成静态部署包**:
-   ```bash
-   make static
-   ```
-   构建完成后，所有的产物将存放在 `./dist` 目录下。
+4. **(可选) 构建其他目标**:
+   - **原生命令行工具**: `make native`
+   - **桌面客户端**: `make tauri`
+   - **VSCode 插件**: `make vscode` (或使用 `make vsix` 打包)
 
 5. **本地开发预览**:
    ```bash
@@ -77,7 +77,7 @@ Waveform Viewer 是一个高性能的 Web 波形查看器，核心解析器采�
 
 #### 插件接口
 
-插件基于 `frontend/src/types/plugin.ts` 中定义的两个主要的 TypeScript 接口：
+插件基于 `frontend/packages/core/src/types/plugin.ts` 中定义的两个主要的 TypeScript 接口：
 
 ```typescript
 export interface FormatView {
@@ -185,9 +185,9 @@ const myBooleanPlugin = {
 
 ##### 1. 内置核心插件
 如果您正在将内置插件直接添加到仓库：
-1. 将您的插件文件放在 `frontend/src/plugins/` 目录中。
-2. 在 `frontend/src/hooks/useAppContext.tsx` 中导入它。
-3. 将其添加到 `useAppContext.tsx` 中 `initialState` 的 `formatPlugins` 数组。
+1. 将您的插件文件放在 `frontend/packages/core/src/plugins/` 目录中。
+2. 在 `frontend/packages/core/src/state/reducer.ts` 中导入它。
+3. 将其添加到 `reducer.ts` 中 `initialState` 的 `formatPlugins` 数组。
 
 ##### 2. 动态注册（在运行时）
 对于在运行时加载的外部插件，应用程序在 `window` 对象上暴漏了全局注册方法：
