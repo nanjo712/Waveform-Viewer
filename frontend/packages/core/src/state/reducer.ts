@@ -187,8 +187,15 @@ export function appReducer(state: AppState, action: Action): AppState {
         case 'SELECT_SIGNALS':
             return { ...state, selectedSignals: action.indices };
 
-        case 'SET_VISIBLE_ROWS':
+        case 'SET_VISIBLE_ROWS': {
+            if (
+                state.visibleRowIndices.length === action.indices.length &&
+                state.visibleRowIndices.every((val, i) => val === action.indices[i])
+            ) {
+                return state;
+            }
             return { ...state, visibleRowIndices: action.indices };
+        }
 
         case 'REMOVE_SIGNAL':
             return {

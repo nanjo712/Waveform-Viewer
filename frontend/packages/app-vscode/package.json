@@ -6,6 +6,10 @@
     "private": true,
     "publisher": "waveform-viewer",
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/nanjo712/Waveform-Viewer.git"
+    },
     "engines": {
         "vscode": "^1.85.0"
     },
