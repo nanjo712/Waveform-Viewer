@@ -66,11 +66,26 @@ function showFilePicker(accept: string): Promise<File | null> {
     });
 }
 
+import VcdWorker from '@waveform-viewer/core/worker?worker';
+
 // Singleton promise for WASM module (loaded once)
 let modulePromise: Promise<VcdParserModule> | null = null;
 
 export class WebPlatformAdapter implements PlatformAdapter {
     readonly platformName = 'web' as const;
+
+    createWorker(): Worker {
+        return new VcdWorker();
+    }
+
+    getWasmConfig(): { jsUri: string; binaryUri?: string } {
+        // In dev and prod, /wasm/ is served from public dir
+        const origin = window.location.origin;
+        return {
+            jsUri: `${origin}/wasm/vcd_parser.js`,
+            binaryUri: `${origin}/wasm/vcd_parser.wasm`
+        };
+    }
 
     async loadWasmModule(): Promise<VcdParserModule> {
         if (!modulePromise) {

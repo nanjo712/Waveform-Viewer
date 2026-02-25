@@ -116,11 +116,11 @@ window.addEventListener('message', (event: MessageEvent<HostToWebviewMessage>) =
 // ── Adapter ────────────────────────────────────────────────────────
 
 let modulePromise: Promise<VcdParserModule> | null = null;
-let wasmConfig: { jsUri: string; binaryUri: string } | null = null;
+let wasmConfig: { jsUri: string; binaryUri: string; workerUri: string } | null = null;
 
-/** Called when the extension host sends the init message with WASM URIs */
-export function setWasmConfig(jsUri: string, binaryUri: string): void {
-    wasmConfig = { jsUri, binaryUri };
+/** Called when the extension host sends the init message with WASM and Worker URIs */
+export function setWasmConfig(jsUri: string, binaryUri: string, workerUri: string): void {
+    wasmConfig = { jsUri, binaryUri, workerUri };
 }
 
 /** Create a PlatformFile from file info sent by the extension host */
@@ -136,42 +136,28 @@ export function postToHost(msg: WebviewToHostMessage): void {
 export class VscodePlatformAdapter implements PlatformAdapter {
     readonly platformName = 'vscode' as const;
 
-    async loadWasmModule(): Promise<VcdParserModule> {
-        if (!modulePromise) {
-            modulePromise = (async () => {
-                if (!wasmConfig) {
-                    throw new Error('WASM config not received from extension host');
-                }
-
-                // Load the Emscripten JS glue via dynamic import
-                // In a webview, we load it as a script tag injection
-                await loadScript(wasmConfig.jsUri);
-
-                const createFn = globalThis.createVcdParser;
-                if (!createFn) {
-                    throw new Error('createVcdParser not found on globalThis after loading script');
-                }
-
-                // Pass locateFile so Emscripten finds the .wasm binary
-                const binaryUri = wasmConfig.binaryUri;
-                return await createFn({
-                    locateFile: (path: string) => {
-                        if (path.endsWith('.wasm')) {
-                            return binaryUri;
-                        }
-                        return path;
-                    },
-                });
-            })();
-
-            // If loading fails, clear the cached promise so a retry
-            // (after setWasmConfig) can succeed instead of returning
-            // the permanently-rejected promise.
-            modulePromise.catch(() => {
-                modulePromise = null;
-            });
+    createWorker(): Worker {
+        if (!wasmConfig || !wasmConfig.workerUri) {
+            throw new Error('Worker URI not received from extension host');
         }
-        return modulePromise;
+        // In VSCode Webview, we load the worker script via the webview URI
+        // provided by the extension host.
+        return new Worker(wasmConfig.workerUri);
+    }
+
+    getWasmConfig(): { jsUri: string; binaryUri?: string } {
+        if (!wasmConfig) {
+            throw new Error('WASM config not received from extension host');
+        }
+        return {
+            jsUri: wasmConfig.jsUri,
+            binaryUri: wasmConfig.binaryUri
+        };
+    }
+
+    async loadWasmModule(): Promise<VcdParserModule> {
+        // Deprecated: the WASM module is now loaded inside the Web Worker
+        throw new Error('loadWasmModule is deprecated. Use a Web Worker instead.');
     }
 
     async pickFile(): Promise<PlatformFile | null> {

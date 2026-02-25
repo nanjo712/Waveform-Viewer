@@ -12,7 +12,7 @@ import type {
 // ── Host → Webview messages ────────────────────────────────────────
 
 export type HostToWebviewMessage =
-    | { type: 'init'; wasmJsUri: string; wasmBinaryUri: string }
+    | { type: 'init'; wasmJsUri: string; wasmBinaryUri: string; workerUri: string }
     | { type: 'fileOpened'; fileName: string; fileSize: number }
     | { type: 'fileSliceResponse'; requestId: number; data: ArrayBuffer }
     | { type: 'signalToggle'; index: number }

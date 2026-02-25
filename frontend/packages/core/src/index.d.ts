@@ -3,7 +3,7 @@ export type { FormatView, FormatPlugin, } from './types/plugin.ts';
 export type { PlatformAdapter, PlatformFile, } from './types/platform.ts';
 export { appReducer, initialState, } from './state/reducer.ts';
 export type { AppState, Action, } from './state/reducer.ts';
-export { VcdService } from './wasm/vcdService.ts';
+export { VcdServiceClient as VcdService } from './wasm/vcdServiceClient.ts';
 export { coreRadixPlugin } from './plugins/coreRadixPlugin.ts';
 export { coreFloatPlugin } from './plugins/coreFloatPlugin.ts';
 export { unflattenChisel, buildSignalDisplayMap, getAllSignalsInScope, } from './utils/chisel.ts';

@@ -51,18 +51,33 @@ const webviewConfig = {
     jsx: 'automatic',
 };
 
+/** @type {esbuild.BuildOptions} */
+const workerConfig = {
+    entryPoints: [path.join(__dirname, '..', 'core', 'src', 'worker', 'vcdWorker.ts')],
+    bundle: true,
+    outfile: path.join(__dirname, 'dist', 'worker.js'),
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2022',
+    sourcemap: true,
+    minify: !isWatch,
+    resolveExtensions: ['.ts', '.js', '.json'],
+};
+
 async function build() {
     if (isWatch) {
-        const [extCtx, webCtx] = await Promise.all([
+        const [extCtx, webCtx, workerCtx] = await Promise.all([
             esbuild.context(extensionConfig),
             esbuild.context(webviewConfig),
+            esbuild.context(workerConfig),
         ]);
-        await Promise.all([extCtx.watch(), webCtx.watch()]);
+        await Promise.all([extCtx.watch(), webCtx.watch(), workerCtx.watch()]);
         console.log('[watch] Watching for changes...');
     } else {
         await Promise.all([
             esbuild.build(extensionConfig),
             esbuild.build(webviewConfig),
+            esbuild.build(workerConfig),
         ]);
         console.log('[build] Extension and webview bundles built successfully.');
     }

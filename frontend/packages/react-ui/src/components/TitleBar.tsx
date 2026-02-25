@@ -11,9 +11,9 @@ export function TitleBar() {
             try {
                 const ok = await vcdService.indexFile(file);
                 if (ok) {
-                    const metadata = vcdService.getMetadata();
-                    const signals = vcdService.getSignals();
-                    const hierarchy = vcdService.getHierarchy();
+                    const metadata = await vcdService.getMetadata();
+                    const signals = await vcdService.getSignals();
+                    const hierarchy = await vcdService.getHierarchy();
                     dispatch({
                         type: 'FILE_LOADED',
                         metadata,

@@ -50,8 +50,8 @@ function WaveformViewWithBridge() {
         const unregister = onHostMessage(async (msg: HostToWebviewMessage) => {
             switch (msg.type) {
                 case 'init': {
-                    if (msg.wasmJsUri && msg.wasmBinaryUri) {
-                        setWasmConfig(msg.wasmJsUri, msg.wasmBinaryUri);
+                    if (msg.wasmJsUri && msg.wasmBinaryUri && msg.workerUri) {
+                        setWasmConfig(msg.wasmJsUri, msg.wasmBinaryUri, msg.workerUri);
                         try {
                             await svc.init();
                             dispatch({ type: 'WASM_READY' });
@@ -75,9 +75,9 @@ function WaveformViewWithBridge() {
                         const file = createPlatformFile(msg.fileName, msg.fileSize);
                         const success = await svc.indexFile(file);
                         if (success) {
-                            const metadata = svc.getMetadata();
-                            const signals = svc.getSignals();
-                            const hierarchy = svc.getHierarchy();
+                            const metadata = await svc.getMetadata();
+                            const signals = await svc.getSignals();
+                            const hierarchy = await svc.getHierarchy();
                             dispatch({
                                 type: 'FILE_LOADED',
                                 metadata,
@@ -133,7 +133,7 @@ function WaveformViewWithBridge() {
 
         // Cleanup: unregister handler on unmount (important for StrictMode)
         return unregister;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ── Send state updates to extension host ───────────────────────

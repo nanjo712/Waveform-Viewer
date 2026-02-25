@@ -48,7 +48,7 @@ export class VcdEditorProvider implements vscode.CustomReadonlyEditorProvider {
         _openContext: vscode.CustomDocumentOpenContext,
         _token: vscode.CancellationToken
     ): Promise<vscode.CustomDocument> {
-        return { uri, dispose: () => {} };
+        return { uri, dispose: () => { } };
     }
 
     async resolveCustomEditor(
@@ -109,11 +109,15 @@ export class VcdEditorProvider implements vscode.CustomReadonlyEditorProvider {
                 const wasmBinaryUri = webview.asWebviewUri(
                     vscode.Uri.joinPath(this.extensionUri, 'media', 'wasm', 'vcd_parser.wasm')
                 );
+                const workerUri = webview.asWebviewUri(
+                    vscode.Uri.joinPath(this.extensionUri, 'dist', 'worker.js')
+                );
 
                 const initMsg: HostToWebviewMessage = {
                     type: 'init',
                     wasmJsUri: wasmJsUri.toString(),
                     wasmBinaryUri: wasmBinaryUri.toString(),
+                    workerUri: workerUri.toString(),
                 };
                 webview.postMessage(initMsg);
 

@@ -23,7 +23,13 @@ export interface PlatformAdapter {
     /** Platform identifier for conditional UI behavior. */
     readonly platformName: 'web' | 'tauri' | 'vscode';
 
-    /** Load the WASM module and return the Emscripten module instance. */
+    /** Create a Web Worker instance for the VcdEngine. */
+    createWorker(): Worker;
+
+    /** Get the URIs needed by the worker to load WASM. */
+    getWasmConfig(): { jsUri: string; binaryUri?: string };
+
+    /** Load the WASM module and return the Emscripten module instance (deprecated in favor of worker). */
     loadWasmModule(): Promise<VcdParserModule>;
 
     /**

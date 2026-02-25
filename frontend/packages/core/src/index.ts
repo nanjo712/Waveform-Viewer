@@ -33,7 +33,7 @@ export type {
 } from './state/reducer.ts';
 
 // ── Services ───────────────────────────────────────────────────────────
-export { VcdService } from './wasm/vcdService.ts';
+export { VcdServiceClient as VcdService } from './wasm/vcdServiceClient.ts';
 
 // ── Plugins ────────────────────────────────────────────────────────────
 export { coreRadixPlugin } from './plugins/coreRadixPlugin.ts';
