@@ -98,7 +98,9 @@ vscode-watch: $(FRONTEND)/node_modules wasm
 
 vsix: vscode
 	@echo ">>> Packaging VSCode extension..."
+	@sed -i 's/"name": "@waveform-viewer\/app-vscode"/"name": "waveform-viewer"/' $(FRONTEND)/packages/app-vscode/package.json
 	@$(FE_RUN) && cd packages/app-vscode && npm run package
+	@sed -i 's/"name": "waveform-viewer"/"name": "@waveform-viewer\/app-vscode"/' $(FRONTEND)/packages/app-vscode/package.json
 
 clean:
 	@echo ">>> Cleaning..."

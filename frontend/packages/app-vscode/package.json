@@ -1,9 +1,10 @@
 {
-    "name": "waveform-viewer",
+    "name": "@waveform-viewer/app-vscode",
     "displayName": "Waveform Viewer",
     "description": "View VCD waveform files natively in VSCode",
-    "version": "0.2.0",
-    "private": true,
+    "icon": "media/icon.png",
+    "version": "0.3.0",
+    "private": false,
     "publisher": "waveform-viewer",
     "license": "MIT",
     "repository": {
@@ -62,7 +63,7 @@
     "scripts": {
         "build": "node esbuild.mjs",
         "watch": "node esbuild.mjs --watch",
-        "package": "vsce package --no-dependencies"
+        "package": "npx @vscode/vsce package --no-dependencies"
     },
     "dependencies": {
         "@waveform-viewer/core": "*",

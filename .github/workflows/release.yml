@@ -105,3 +105,11 @@ jobs:
           files: waveform-viewer.vsix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish VSCode Extension
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sed -i 's/"name": "@waveform-viewer\/app-vscode"/"name": "waveform-viewer"/' frontend/packages/app-vscode/package.json
+          cd frontend/packages/app-vscode
+          npx @vscode/vsce publish -p ${{ secrets.VSCE_TOKEN }} --no-dependencies
+          sed -i 's/"name": "waveform-viewer"/"name": "@waveform-viewer\/app-vscode"/' package.json
