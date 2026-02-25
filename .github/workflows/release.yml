@@ -51,9 +51,11 @@ jobs:
       - name: Setup emscripten
         uses: mymindstorm/setup-emsdk@v14
 
-      - name: Build WASM and Frontend
-        # Ensure our manual build happens first so Tauri finds the assets
-        run: make build
+      - name: Build WASM and Dependencies
+        # Build WASM and install frontend dependencies before Tauri build
+        run: |
+          cd frontend && npm install
+          cd .. && make wasm
 
       - name: Build Tauri App
         id: tauri_build
@@ -83,5 +85,23 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: waveform-viewer-portable.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build VSCode Extension
+        if: matrix.platform == 'ubuntu-22.04'
+        run: make vsix
+
+      - name: Copy VSCode Extension
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          find frontend/packages/app-vscode -maxdepth 1 -name "*.vsix" -exec cp {} ./waveform-viewer.vsix \;
+
+      - name: Upload VSCode Extension
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: waveform-viewer.vsix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

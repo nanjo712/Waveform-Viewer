@@ -25,23 +25,18 @@ else
     EMMAKE  := emmake
 endif
 
-.PHONY: all wasm native frontend dev start build static serve clean help \
-       vscode vscode-watch vscode-launch vscode-test
+.PHONY: all wasm native web tauri vsix dev clean help \
+       vscode
 
 help:
 	@echo "Usage:"
 	@echo "  make wasm       Build WASM module"
 	@echo "  make native     Build native CLI (vcd_viewer)"
-	@echo "  make frontend   Build React frontend"
+	@echo "  make web        Build React web app and create static package"
+	@echo "  make tauri      Build Tauri desktop application"
 	@echo "  make dev        Start Vite dev server (on port 3000)"
-	@echo "  make start      Alias for 'make wasm dev'"
-	@echo "  make build      Build both WASM and Frontend"
-	@echo "  make static     Create portable build in ./dist"
-	@echo "  make serve      Serve static build from ./dist"
-	@echo "  make vscode     Build VSCode extension"
-	@echo "  make vscode-watch  Watch mode for VSCode extension"
-	@echo "  make vscode-launch Build & open Extension Dev Host with test file"
-	@echo "  make vscode-test   Build & open Extension Dev Host (no file)"
+	@echo "  make vscode     Build VSCode extension package"
+	@echo "  make vsix       Package VSCode extension (.vsix)"
 	@echo "  make clean      Remove build artifacts"
 
 # ── WASM build ──────────────────────────────────────────────────────
@@ -74,9 +69,16 @@ $(FRONTEND)/node_modules: $(FRONTEND)/package.json
 	@$(FE_RUN) && npm install
 	@touch $@
 
-frontend: $(FRONTEND)/node_modules wasm
-	@echo ">>> Building Production Frontend..."
+web: $(FRONTEND)/node_modules wasm
+	@echo ">>> Building Production Web App..."
 	@$(FE_RUN) && npm run build
+	@echo ">>> Creating web package..."
+	@rm -rf dist && cp -r $(FRONTEND)/packages/app-web/dist dist
+
+tauri: $(FRONTEND)/node_modules wasm
+	@echo ">>> Building Tauri application..."
+	@$(FE_RUN) && npm run build:tauri
+	@cd $(FRONTEND)/packages/app-tauri && npx @tauri-apps/cli build
 
 dev: $(FRONTEND)/node_modules wasm
 	@echo ">>> Starting Dev Server..."
@@ -94,34 +96,9 @@ vscode-watch: $(FRONTEND)/node_modules wasm
 	@echo ">>> Starting VSCode extension watch mode..."
 	@$(FE_RUN) && cd packages/app-vscode && node esbuild.mjs --watch
 
-vscode-launch: vscode
-	@echo ">>> Launching Extension Development Host..."
-	@code --extensionDevelopmentPath=$(CURDIR)/$(VSCODE_PKG) \
-		$(CURDIR)/tests/test_multibit.vcd
-
-vscode-test: vscode
-	@echo ">>> Launching Extension Development Host (no file)..."
-	@code --extensionDevelopmentPath=$(CURDIR)/$(VSCODE_PKG)
-
-# ── Composite Targets ───────────────────────────────────────────────
-
-start: dev
-
-build: frontend
-
-static: build
-	@echo ">>> Creating static package..."
-	@rm -rf dist && cp -r $(FRONTEND)/packages/app-web/dist dist
-
-serve:
-	@echo ">>> Serving static build on http://localhost:8080 ..."
-	@if npx serve -v >/dev/null 2>&1; then \
-		npx serve -l 8080 dist; \
-	elif python3 -m http.server --help >/dev/null 2>&1; then \
-		cd dist && python3 -m http.server 8080; \
-	else \
-		echo "Error: npx or python3 required."; exit 1; \
-	fi
+vsix: vscode
+	@echo ">>> Packaging VSCode extension..."
+	@$(FE_RUN) && cd packages/app-vscode && npm run package
 
 clean:
 	@echo ">>> Cleaning..."
