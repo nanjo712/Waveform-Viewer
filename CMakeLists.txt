@@ -147,6 +147,3 @@ else()
     add_executable(vcd_viewer src/main.cpp)
     target_link_libraries(vcd_viewer PRIVATE vcd_parser fst)
 endif()
-
-# Create a symbolink from build_dir/compile_commands.json to project root
-file(CREATE_LINK "${CMAKE_BINARY_DIR}/compile_commands.json" "${CMAKE_SOURCE_DIR}/build/compile_commands.json" SYMBOLIC)
