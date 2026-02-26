@@ -105,6 +105,11 @@ if(EMSCRIPTEN)
     target_include_directories(vcd_parser PUBLIC include)
     target_link_libraries(vcd_parser PRIVATE nlohmann_json::nlohmann_json fst)
 
+    target_compile_options(fst_wasm PRIVATE
+        -sUSE_ZLIB=1
+        -sUSE_BZIP2=1
+    )
+
     # Embind + WASM flags
     target_link_options(vcd_parser PRIVATE
         --bind
@@ -125,6 +130,7 @@ if(EMSCRIPTEN)
         -sDISABLE_EXCEPTION_CATCHING=1
         -sDYNAMIC_EXECUTION=0
         -sUSE_ZLIB=1
+        -sUSE_BZIP2=1
     )
 
     # Output to wasm/ directory
