@@ -2,7 +2,7 @@
     "name": "@waveform-viewer/core",
     "private": true,
     "license": "MIT",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "type": "module",
     "main": "./src/index.ts",
     "types": "./src/index.ts",
