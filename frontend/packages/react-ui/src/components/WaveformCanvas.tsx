@@ -36,6 +36,7 @@ function parseBitValue(val: string): number | null {
     if (val === '0') return 0;
     if (val === 'x' || val === 'X') return -1; // unknown
     if (val === 'z' || val === 'Z') return -2; // high-z
+    if (val === 'g') return -3; // glitch
     return null;
 }
 
@@ -391,6 +392,7 @@ export function WaveformCanvas() {
         const path1 = new Path2D();
         const pathX = new Path2D();
         const pathZ = new Path2D();
+        const pathG = new Path2D();
 
         const addSegment = (val: string, fromX: number, toX: number) => {
             const f = Math.max(fromX, 0);
@@ -411,6 +413,8 @@ export function WaveformCanvas() {
             } else if (bit === -2) {
                 pathZ.moveTo(f, rowMid);
                 pathZ.lineTo(t, rowMid);
+            } else if (bit === -3) {
+                pathG.rect(f, rowTop, t - f, rowBot - rowTop);
             }
         };
 
@@ -436,10 +440,13 @@ export function WaveformCanvas() {
         // But we can use Path2D to batch lines.
 
         // Z processing (Dashed)
-        ctx.strokeStyle = '#dcdcaa';
         ctx.setLineDash([4, 4]);
         ctx.stroke(pathZ);
         ctx.setLineDash([]);
+
+        // Glitch processing (Solid block)
+        ctx.fillStyle = 'rgba(120, 120, 120, 0.4)';
+        ctx.fill(pathG);
 
         // 3. Draw transitions (vertical edges)
         const pathTrans = new Path2D();
@@ -451,10 +458,24 @@ export function WaveformCanvas() {
             if (x >= 0 && x <= canvasWidth) {
                 const b1 = parseBitValue(prevVal);
                 const b2 = parseBitValue(val);
-                const y1 = b1 === 1 ? rowTop : b1 === 0 ? rowBot : rowMid;
-                const y2 = b2 === 1 ? rowTop : b2 === 0 ? rowBot : rowMid;
-                pathTrans.moveTo(x, y1);
-                pathTrans.lineTo(x, y2);
+
+                // If either is a glitch, we don't necessarily need a vertical line 
+                // but let's draw it if it's a boundary to a normal state
+                if (b1 !== -3 && b2 !== -3) {
+                    const y1 = b1 === 1 ? rowTop : b1 === 0 ? rowBot : rowMid;
+                    const y2 = b2 === 1 ? rowTop : b2 === 0 ? rowBot : rowMid;
+                    pathTrans.moveTo(x, y1);
+                    pathTrans.lineTo(x, y2);
+                } else if (b1 === -3 && b2 !== -3) {
+                    // Transition exit from glitch
+                    const y2 = b2 === 1 ? rowTop : b2 === 0 ? rowBot : rowMid;
+                    pathTrans.moveTo(x, rowTop);
+                    pathTrans.lineTo(x, rowBot); // Full height for glitch boundary
+                } else if (b1 !== -3 && b2 === -3) {
+                    // Transition entry to glitch
+                    pathTrans.moveTo(x, rowTop);
+                    pathTrans.lineTo(x, rowBot);
+                }
             }
             prevVal = val;
         }
@@ -488,19 +509,21 @@ export function WaveformCanvas() {
         const pathNormal = new Path2D();
         const pathX = new Path2D();
         const pathZ = new Path2D();
+        const pathG = new Path2D();
 
         const formatter = formatView?.format || ((val: string, w: number) => {
             let r = val;
+            if (r === 'GLITCH') return { display: 'GLITCH', isX: false, isZ: false, isG: true };
             if (r.startsWith('b') || r.startsWith('B')) r = r.slice(1);
-            const isX = r.includes('x') || r.includes('X');
+            const isX = r.includes('x') || r.includes('X') || r.includes('u');
             const isZ = r.includes('z') || r.includes('Z');
-            if (isX) return { display: 'X', isX: true, isZ: false };
-            if (isZ) return { display: 'Z', isX: false, isZ: true };
+            if (isX) return { display: 'X', isX: true, isZ: false, isG: false };
+            if (isZ) return { display: 'Z', isX: false, isZ: true, isG: false };
             try {
                 const bigValue = BigInt('0b' + r.padStart(w, '0'));
-                return { display: '0x' + bigValue.toString(16).toUpperCase(), isX: false, isZ: false };
+                return { display: '0x' + bigValue.toString(16).toUpperCase(), isX: false, isZ: false, isG: false };
             } catch {
-                return { display: r, isX: false, isZ: false };
+                return { display: r, isX: false, isZ: false, isG: false };
             }
         });
 
@@ -517,17 +540,37 @@ export function WaveformCanvas() {
             const t = Math.min(toX, canvasWidth + slant);
             if (f >= t) return;
 
-            const parsed = formatter(val, width);
-            const p = parsed.isX ? pathX : parsed.isZ ? pathZ : pathNormal;
+            // --- FAST PATH: Identify segment type without BigInt/Formatting ---
+            let type: 'g' | 'x' | 'z' | 'n' = 'n';
+            if (val === 'GLITCH') {
+                type = 'g';
+            } else {
+                for (let i = 0; i < val.length; i++) {
+                    const c = val[i];
+                    if (c === 'x' || c === 'X' || c === 'u' || c === 'U') {
+                        type = 'x';
+                        break;
+                    }
+                    if (c === 'z' || c === 'Z') {
+                        type = 'z';
+                        break;
+                    }
+                }
+            }
 
-            const midY = (rowTop + rowBot) / 2;
-            p.moveTo(f + slant, rowTop);
-            p.lineTo(t - slant, rowTop);
-            p.lineTo(t, midY);
-            p.lineTo(t - slant, rowBot);
-            p.lineTo(f + slant, rowBot);
-            p.lineTo(f, midY);
-            p.closePath();
+            if (type === 'g') {
+                pathG.rect(f, rowTop, t - f, rowBot - rowTop);
+            } else {
+                const p = type === 'x' ? pathX : type === 'z' ? pathZ : pathNormal;
+                const midY = (rowTop + rowBot) / 2;
+                p.moveTo(f + slant, rowTop);
+                p.lineTo(t - slant, rowTop);
+                p.lineTo(t, midY);
+                p.lineTo(t - slant, rowBot);
+                p.lineTo(f + slant, rowBot);
+                p.lineTo(f, midY);
+                p.closePath();
+            }
 
             // Text rendering (only if wide enough)
             const segWidth = t - f;
@@ -562,6 +605,12 @@ export function WaveformCanvas() {
         ctx.strokeStyle = '#dcdcaa';
         ctx.fill(pathZ);
         ctx.stroke(pathZ);
+
+        // Stroke and Fill Glitch
+        ctx.fillStyle = 'rgba(150, 150, 150, 0.5)';
+        ctx.strokeStyle = '#888888';
+        ctx.fill(pathG);
+        ctx.stroke(pathG);
 
         // TEXT PASS (Only for wide segments)
         ctx.fillStyle = color;

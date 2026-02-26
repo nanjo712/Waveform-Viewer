@@ -165,7 +165,10 @@ namespace vcd
 
         // --- LOD (Downsampling) State ---
         float pixel_time_step = -1.0f;
-        std::unordered_map<uint32_t, uint64_t> last_emitted_time;
+        std::vector<uint64_t> last_emitted_time;
+        std::vector<int64_t> last_index_1bit;
+        std::vector<int64_t> last_index_multi;
+        std::vector<bool> signal_is_glitch;
 
         std::vector<Transition1Bit> query_res_1bit;
         std::vector<TransitionMultiBit> query_res_multibit;
@@ -203,6 +206,9 @@ namespace vcd
             header_done = false;
             pixel_time_step = -1.0f;
             last_emitted_time.clear();
+            last_index_1bit.clear();
+            last_index_multi.clear();
+            signal_is_glitch.clear();
         }
 
         static std::string_view trim(std::string_view sv)
@@ -273,28 +279,51 @@ namespace vcd
 
                 if (emit && is_queried && pixel_time_step > 0.0f)
                 {
-                    auto last_it = last_emitted_time.find(idx);
-                    if (last_it != last_emitted_time.end())
+                    if (current_time - last_emitted_time[idx] <
+                        static_cast<uint64_t>(pixel_time_step))
                     {
-                        if ((current_time - last_it->second) <
-                            static_cast<uint64_t>(pixel_time_step))
+                        // Multiple transitions within one pixelTimeStep detected
+                        if (!signal_is_glitch[idx])
                         {
-                            // Suppress this transition because it's too close
-                            // to the last one Update internal state but do not
-                            // emit
+                            // Mark the previous transition as GLITCH
                             if (sig.width == 1 && is_1bit)
                             {
-                                set_1bit_state(current_state_1bit,
-                                               sig.bit_index,
-                                               char_to_val2b(val_tok[0]));
+                                int64_t last_idx = last_index_1bit[idx];
+                                if (last_idx >= 0)
+                                {
+                                    query_res_1bit[last_idx].value = 4; // GLITCH
+                                }
                             }
                             else if (sig.width > 1)
                             {
-                                current_state_multibit[sig.str_index] =
-                                    std::string(val_tok);
+                                int64_t last_idx = last_index_multi[idx];
+                                if (last_idx >= 0)
+                                {
+                                    // Use a special convention for multi-bit glitch if needed,
+                                    // but for Multi-bit, we can just use the string "GLITCH"
+                                    // or mark it via a special field.
+                                    // For now, let's stick to the user's idea of a "state".
+                                    // We'll append "GLITCH" to the string pool for this transition.
+                                    uint32_t offset = static_cast<uint32_t>(query_string_pool.size());
+                                    const std::string g_str = "GLITCH";
+                                    query_string_pool.append(g_str);
+                                    query_res_multibit[last_idx].string_offset = offset;
+                                    query_res_multibit[last_idx].string_length = static_cast<uint32_t>(g_str.size());
+                                }
                             }
-                            continue;
+                            signal_is_glitch[idx] = true;
                         }
+
+                        // Still need to update current internal state for consistency
+                        if (sig.width == 1 && is_1bit)
+                        {
+                            set_1bit_state(current_state_1bit, sig.bit_index, char_to_val2b(val_tok[0]));
+                        }
+                        else if (sig.width > 1)
+                        {
+                            current_state_multibit[sig.str_index] = std::string(val_tok);
+                        }
+                        continue;
                     }
                 }
 
@@ -305,27 +334,30 @@ namespace vcd
 
                     if (emit && is_queried)
                     {
-                        query_res_1bit.push_back(
-                            {current_time, idx, v, {0, 0, 0}});
+                        last_index_1bit[idx] = static_cast<int64_t>(query_res_1bit.size());
+                        query_res_1bit.push_back({current_time, idx, v, {0, 0, 0}});
                         if (pixel_time_step > 0.0f)
+                        {
                             last_emitted_time[idx] = current_time;
+                            signal_is_glitch[idx] = false;
+                        }
                     }
                 }
                 else if (sig.width > 1)
                 {
-                    current_state_multibit[sig.str_index] =
-                        std::string(val_tok);
+                    current_state_multibit[sig.str_index] = std::string(val_tok);
 
                     if (emit && is_queried)
                     {
-                        uint32_t offset =
-                            static_cast<uint32_t>(query_string_pool.size());
+                        uint32_t offset = static_cast<uint32_t>(query_string_pool.size());
                         query_string_pool.append(val_tok);
-                        query_res_multibit.push_back(
-                            {current_time, idx, offset,
-                             static_cast<uint32_t>(val_tok.size()), 0});
+                        last_index_multi[idx] = static_cast<int64_t>(query_res_multibit.size());
+                        query_res_multibit.push_back({current_time, idx, offset, static_cast<uint32_t>(val_tok.size()), 0});
                         if (pixel_time_step > 0.0f)
+                        {
                             last_emitted_time[idx] = current_time;
+                            signal_is_glitch[idx] = false;
+                        }
                     }
                 }
             }
@@ -888,7 +920,12 @@ namespace vcd
         impl_->leftover_file_offset = 0;
         impl_->query_cancel_flag.store(false);
         impl_->pixel_time_step = pixel_step;
-        impl_->last_emitted_time.clear();
+        
+        size_t n_sigs = impl_->signal_defs.size();
+        impl_->last_emitted_time.assign(n_sigs, 0);
+        impl_->last_index_1bit.assign(n_sigs, -1);
+        impl_->last_index_multi.assign(n_sigs, -1);
+        impl_->signal_is_glitch.assign(n_sigs, false);
 
         // Restore state from the specified snapshot
         if (snapshot_index < impl_->snapshots.size())
@@ -974,7 +1011,9 @@ namespace vcd
             {
                 for (uint32_t idx : impl_->query_signal_indices)
                 {
-                    impl_->last_emitted_time[idx] = impl_->query_t_begin;
+                    if (idx < impl_->last_emitted_time.size()) {
+                        impl_->last_emitted_time[idx] = impl_->query_t_begin;
+                    }
                 }
             }
         }

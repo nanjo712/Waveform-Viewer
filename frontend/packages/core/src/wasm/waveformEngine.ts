@@ -21,7 +21,7 @@ const QUERY_CHUNK_SIZE = 32 * 1024 * 1024;
 const SIZEOF_TRANSITION_1BIT = 16;
 const SIZEOF_TRANSITION_MULTIBIT = 24;
 
-const VALUE_MAP = ['0', '1', 'x', 'z'] as const;
+const VALUE_MAP = ['0', '1', 'x', 'z', 'g'] as const;
 
 export class WaveformEngine {
     private parser: VcdParser | FstParser | null = null;

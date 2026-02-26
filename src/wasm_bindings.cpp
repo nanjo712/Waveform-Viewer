@@ -498,7 +498,11 @@ class FstParserWasm
         fstReaderSetLimitTimeRange(ctx_, start_time, end_time);
         fstReaderClrFacProcessMaskAll(ctx_);
 
-        last_emitted_time_.assign(signals_.size(), 0xFFFFFFFFFFFFFFFFULL);
+        size_t n_sigs = signals_.size();
+        last_emitted_time_.assign(n_sigs, 0xFFFFFFFFFFFFFFFFULL);
+        last_index_1bit_.assign(n_sigs, -1);
+        last_index_multi_.assign(n_sigs, -1);
+        signal_is_glitch_.assign(n_sigs, false);
 
         res_1bit_.clear();
         res_multi_.clear();
@@ -579,11 +583,12 @@ class FstParserWasm
 
     float pixel_time_step_ = -1.0f;
     std::vector<uint64_t> last_emitted_time_;
+    std::vector<int64_t> last_index_1bit_;
+    std::vector<int64_t> last_index_multi_;
+    std::vector<bool> signal_is_glitch_;
     uint64_t query_t_begin_ = 0;
     uint64_t query_t_end_ = 0;
-    size_t total_rx_count_ = 0;
     size_t in_range_count_ = 0;
-    size_t not_in_range_count_ = 0;
 
     bool query_done_{false};
 
@@ -611,13 +616,41 @@ class FstParserWasm
         if (it == handle_to_sig_.end()) return;
         uint32_t sig_idx = it->second;
 
-        // LOD Downsampling
+        // LOD Downsampling / Glitch Detection
         if (pixel_time_step_ > 0.0f &&
             last_emitted_time_[sig_idx] != 0xFFFFFFFFFFFFFFFFULL)
         {
             if ((time - last_emitted_time_[sig_idx]) <
                 static_cast<uint64_t>(pixel_time_step_))
             {
+                if (!signal_is_glitch_[sig_idx])
+                {
+                    const vcd::SignalDef& s = signals_[sig_idx];
+                    if (s.width == 1)
+                    {
+                        int64_t last_idx = last_index_1bit_[sig_idx];
+                        if (last_idx >= 0)
+                        {
+                            res_1bit_[last_idx].value = 4;  // GLITCH
+                        }
+                    }
+                    else
+                    {
+                        int64_t last_idx = last_index_multi_[sig_idx];
+                        if (last_idx >= 0)
+                        {
+                            uint32_t offset =
+                                static_cast<uint32_t>(string_pool_.size());
+                            const std::string g_str = "GLITCH";
+                            string_pool_.insert(string_pool_.end(),
+                                                g_str.begin(), g_str.end());
+                            res_multi_[last_idx].string_offset = offset;
+                            res_multi_[last_idx].string_length =
+                                static_cast<uint32_t>(g_str.size());
+                        }
+                    }
+                    signal_is_glitch_[sig_idx] = true;
+                }
                 return;
             }
         }
@@ -648,6 +681,7 @@ class FstParserWasm
             else
                 t.value = 0;
 
+            last_index_1bit_[sig_idx] = static_cast<int64_t>(res_1bit_.size());
             res_1bit_.push_back(t);
         }
         else
@@ -665,8 +699,13 @@ class FstParserWasm
 
             t.string_length = len;
             string_pool_.insert(string_pool_.end(), value, value + len);
+            last_index_multi_[sig_idx] =
+                static_cast<int64_t>(res_multi_.size());
             res_multi_.push_back(t);
         }
+
+        last_emitted_time_[sig_idx] = time;
+        signal_is_glitch_[sig_idx] = false;
     }
 
     static const char* varTypeStr(vcd::VarType t)

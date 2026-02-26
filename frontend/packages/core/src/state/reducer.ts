@@ -68,6 +68,9 @@ export interface AppState {
 
     /** Triggers a force refresh when incremented */
     queryCounter: number;
+
+    /** LOD Aggregation Factor: 1.0 = 1 pixel, 5.0 = 5 pixels */
+    lodPixelFactor: number;
 }
 
 export const initialState: AppState = {
@@ -92,6 +95,7 @@ export const initialState: AppState = {
     formatPlugins: [coreRadixPlugin, coreFloatPlugin],
     activeSignalIndex: null,
     queryCounter: 0,
+    lodPixelFactor: 1.0,
 };
 
 // ── Actions ────────────────────────────────────────────────────────────
@@ -122,7 +126,8 @@ export type Action =
     | { type: 'SET_SIGNAL_FORMAT'; index: number; format: string }
     | { type: 'REGISTER_PLUGIN'; plugin: FormatPlugin }
     | { type: 'SET_ACTIVE_SIGNAL'; index: number | null }
-    | { type: 'FORCE_REFRESH' };
+    | { type: 'FORCE_REFRESH' }
+    | { type: 'SET_LOD_FACTOR'; factor: number };
 
 // ── Reducer ────────────────────────────────────────────────────────────
 
@@ -261,6 +266,9 @@ export function appReducer(state: AppState, action: Action): AppState {
 
         case 'FORCE_REFRESH':
             return { ...state, queryCounter: state.queryCounter + 1 };
+
+        case 'SET_LOD_FACTOR':
+            return { ...state, lodPixelFactor: action.factor };
 
         default:
             return state;

@@ -102,7 +102,7 @@ export function AppProvider({ adapter, waveformService, autoInitWasm = false, ch
         const executeQuery = async () => {
             // Heuristic for LOD: assume the canvas is roughly window.innerWidth in width.
             const canvasWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
-            const pixelTimeStep = w / canvasWidth;
+            const bucketTimeStep = (w / canvasWidth) * state.lodPixelFactor;
 
             try {
                 const result = await waveformService.query(
@@ -110,7 +110,7 @@ export function AppProvider({ adapter, waveformService, autoInitWasm = false, ch
                     reqEnd,
                     state.visibleRowIndices,
                     undefined, // AbortSignal no longer needed, managed by Service queue
-                    pixelTimeStep,
+                    bucketTimeStep,
                     (partialResult) => {
                         // PROGRESSIVE RENDERING: Streaming partial updates directly to canvas
                         dispatch({ type: 'SET_QUERY_RESULT', result: partialResult });
