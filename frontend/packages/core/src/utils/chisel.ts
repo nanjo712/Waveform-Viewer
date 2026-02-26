@@ -134,7 +134,29 @@ export function unflattenChisel(node: ScopeNode, signals: SignalDef[]): ScopeNod
         clone.uiSignals.sort((a, b) => a.name.localeCompare(b.name));
     }
 
+    // Populate totalSignalCount recursively
+    populateSignalCounts(clone);
+
     return clone;
+}
+
+/** Recursively calculate and set totalSignalCount for each node. */
+export function populateSignalCounts(node: ScopeNode): number {
+    let count = 0;
+    if (node.uiSignals) {
+        count += node.uiSignals.length;
+    } else if (node.signals) {
+        count += node.signals.length;
+    }
+
+    if (node.children) {
+        for (const child of node.children) {
+            count += populateSignalCounts(child);
+        }
+    }
+
+    node.totalSignalCount = count;
+    return count;
 }
 
 /** Display metadata for a signal in the waveform list under Chisel mode. */
@@ -190,6 +212,24 @@ export function buildSignalDisplayMap(root: ScopeNode): Map<number, SignalDispla
 
     walk(root, []);
     return map;
+}
+
+export function getSignalCountInScope(node: ScopeNode): number {
+    if (node.totalSignalCount !== undefined) return node.totalSignalCount;
+
+    let count = 0;
+    if (node.uiSignals) {
+        count += node.uiSignals.length;
+    } else if (node.signals) {
+        count += node.signals.length;
+    }
+
+    if (node.children) {
+        for (const child of node.children) {
+            count += getSignalCountInScope(child);
+        }
+    }
+    return count;
 }
 
 export function getAllSignalsInScope(node: ScopeNode): number[] {

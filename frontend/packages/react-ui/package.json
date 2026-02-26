@@ -11,7 +11,9 @@
         "./styles/App.css": "./src/styles/App.css"
     },
     "dependencies": {
-        "@waveform-viewer/core": "*"
+        "@types/react-window": "^1.8.8",
+        "@waveform-viewer/core": "*",
+        "react-window": "^2.2.7"
     },
     "peerDependencies": {
         "react": "^19.0.0",

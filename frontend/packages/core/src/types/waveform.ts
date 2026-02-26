@@ -17,6 +17,8 @@ export interface ScopeNode {
     signals?: number[];
     children?: ScopeNode[];
     uiSignals?: { index: number; name: string }[];
+    /** Total count of signals in this scope and all sub-scopes */
+    totalSignalCount?: number;
 }
 
 /** A single transition: [timestamp, value] */

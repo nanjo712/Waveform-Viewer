@@ -45,5 +45,7 @@ export {
     unflattenChisel,
     buildSignalDisplayMap,
     getAllSignalsInScope,
+    getSignalCountInScope,
+    populateSignalCounts,
 } from './utils/chisel.ts';
 export type { SignalDisplayInfo } from './utils/chisel.ts';

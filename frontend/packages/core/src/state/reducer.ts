@@ -15,6 +15,7 @@ import type {
 import type { FormatPlugin } from '../types/plugin.ts';
 import { coreRadixPlugin } from '../plugins/coreRadixPlugin.ts';
 import { coreFloatPlugin } from '../plugins/coreFloatPlugin.ts';
+import { populateSignalCounts } from '../utils/chisel.ts';
 
 // ── State ──────────────────────────────────────────────────────────────
 
@@ -136,6 +137,12 @@ export function appReducer(state: AppState, action: Action): AppState {
         case 'FILE_LOADED': {
             const tBegin = action.metadata.timeBegin;
             const tEnd = action.metadata.timeEnd;
+
+            // Pre-calculate signal counts for faster tree rendering
+            if (action.hierarchy) {
+                populateSignalCounts(action.hierarchy);
+            }
+
             // Default view: show only the last 100 timescale units
             const DEFAULT_VIEW_RANGE = 100;
             const totalRange = tEnd - tBegin;

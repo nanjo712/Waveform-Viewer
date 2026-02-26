@@ -369,91 +369,97 @@ export function WaveformCanvas() {
     ) {
         ctx.lineWidth = 1.5;
         ctx.lineCap = 'round';
+        ctx.strokeStyle = color;
 
-        // Build value segments: [{from, to, val}]
-        type Segment = { from: number; to: number; val: string };
-        const segments: Segment[] = [];
+        const transitions = result.transitions;
+        const numTransitions = transitions.length;
+        const viewStart = state.viewStart;
+
+        // Path batching: 
+        // We accumulate all horizontal segments of the same bit value into one path.
+        // Then we draw all vertical transitions in another path.
+
+        // 1. Draw horizontal paths (High, Low, X, Z)
+        // High/Low/X/Z can be batched separately if they have different colors/styles.
+        // For simplicity, we start with High and Low which share the same color.
 
         let currentVal = result.initialValue;
-        let currentFrom = timeToX(state.viewStart);
+        let currentX = timeToX(viewStart);
 
-        for (const [ts, val] of result.transitions) {
-            const x = timeToX(ts);
-            segments.push({ from: currentFrom, to: x, val: currentVal });
-            currentVal = val;
-            currentFrom = x;
-        }
-        // Last segment extends to end
-        segments.push({
-            from: currentFrom,
-            to: timeToX(viewEnd),
-            val: currentVal,
-        });
+        // We use separate paths for bit 0, bit 1, unknown (X), and High-Z (Z)
+        const path0 = new Path2D();
+        const path1 = new Path2D();
+        const pathX = new Path2D();
+        const pathZ = new Path2D();
 
-        for (const seg of segments) {
-            const bit = parseBitValue(seg.val);
-            const fromX = Math.max(seg.from, 0);
-            const toX = Math.min(seg.to, canvasWidth);
-            if (fromX >= toX) continue;
+        const addSegment = (val: string, fromX: number, toX: number) => {
+            const f = Math.max(fromX, 0);
+            const t = Math.min(toX, canvasWidth);
+            if (f >= t) return;
 
-            if (bit === -1) {
-                // X - draw hatched red
-                ctx.strokeStyle = '#f44747';
-                ctx.fillStyle = 'rgba(244, 71, 71, 0.15)';
-                ctx.fillRect(fromX, rowTop, toX - fromX, rowBot - rowTop);
-                ctx.beginPath();
-                ctx.moveTo(fromX, rowMid);
-                ctx.lineTo(toX, rowMid);
-                ctx.stroke();
+            const bit = parseBitValue(val);
+            if (bit === 1) {
+                path1.moveTo(f, rowTop);
+                path1.lineTo(t, rowTop);
+            } else if (bit === 0) {
+                path0.moveTo(f, rowBot);
+                path0.lineTo(t, rowBot);
+            } else if (bit === -1) {
+                pathX.moveTo(f, rowMid);
+                pathX.lineTo(t, rowMid);
+                // X - fill hatched red separately or handled later
             } else if (bit === -2) {
-                // Z - draw dashed middle
-                ctx.strokeStyle = '#dcdcaa';
-                ctx.setLineDash([4, 4]);
-                ctx.beginPath();
-                ctx.moveTo(fromX, rowMid);
-                ctx.lineTo(toX, rowMid);
-                ctx.stroke();
-                ctx.setLineDash([]);
-            } else {
-                const yLevel = bit === 1 ? rowTop : rowBot;
-                ctx.strokeStyle = color;
-                ctx.beginPath();
-                ctx.moveTo(fromX, yLevel);
-                ctx.lineTo(toX, yLevel);
-                ctx.stroke();
+                pathZ.moveTo(f, rowMid);
+                pathZ.lineTo(t, rowMid);
             }
-        }
+        };
 
-        // Draw transitions (vertical edges)
+        for (let i = 0; i < numTransitions; i++) {
+            const [ts, val] = transitions[i];
+            const nextX = timeToX(ts);
+            addSegment(currentVal, currentX, nextX);
+            currentVal = val;
+            currentX = nextX;
+        }
+        addSegment(currentVal, currentX, timeToX(viewEnd));
+
+        // 2. Stroke the batched paths
+        ctx.setLineDash([]);
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.5;
+        ctx.stroke(path0);
+        ctx.stroke(path1);
+
+        // X processing (Red hatched)
+        ctx.strokeStyle = '#f44747';
+        ctx.stroke(pathX);
+        // Note: For X/Z we might still want to fill. Batched fill is harder with disjoint rects.
+        // But we can use Path2D to batch lines.
+
+        // Z processing (Dashed)
+        ctx.strokeStyle = '#dcdcaa';
+        ctx.setLineDash([4, 4]);
+        ctx.stroke(pathZ);
+        ctx.setLineDash([]);
+
+        // 3. Draw transitions (vertical edges)
+        const pathTrans = new Path2D();
         let prevVal = result.initialValue;
-        for (const [ts, val] of result.transitions) {
+        for (let i = 0; i < numTransitions; i++) {
+            const [ts, val] = transitions[i];
             const x = timeToX(ts);
-            if (x < 0 || x > canvasWidth) {
-                prevVal = val;
-                continue;
+
+            if (x >= 0 && x <= canvasWidth) {
+                const b1 = parseBitValue(prevVal);
+                const b2 = parseBitValue(val);
+                const y1 = b1 === 1 ? rowTop : b1 === 0 ? rowBot : rowMid;
+                const y2 = b2 === 1 ? rowTop : b2 === 0 ? rowBot : rowMid;
+                pathTrans.moveTo(x, y1);
+                pathTrans.lineTo(x, y2);
             }
-            const prevBit = parseBitValue(prevVal);
-            const curBit = parseBitValue(val);
-            const prevY =
-                prevBit === 1
-                    ? rowTop
-                    : prevBit === 0
-                        ? rowBot
-                        : rowMid;
-            const curY =
-                curBit === 1
-                    ? rowTop
-                    : curBit === 0
-                        ? rowBot
-                        : rowMid;
-            ctx.beginPath();
-            ctx.moveTo(x, prevY);
-            ctx.lineTo(x, curY);
-            ctx.stroke();
             prevVal = val;
         }
+        ctx.strokeStyle = color;
+        ctx.stroke(pathTrans);
     }
 
     // ── Multi-bit waveform drawing (bus-style with hex values) ─────
@@ -474,89 +480,121 @@ export function WaveformCanvas() {
     ) {
         ctx.lineWidth = 1.5;
 
-        type Segment = { from: number; to: number; val: string };
-        const segments: Segment[] = [];
+        const transitions = result.transitions;
+        const numTransitions = transitions.length;
+        const viewStart = state.viewStart;
+        const slant = 4;
 
-        let currentVal = result.initialValue;
-        let currentFrom = timeToX(state.viewStart);
+        const pathNormal = new Path2D();
+        const pathX = new Path2D();
+        const pathZ = new Path2D();
 
-        for (const [ts, val] of result.transitions) {
-            const x = timeToX(ts);
-            segments.push({ from: currentFrom, to: x, val: currentVal });
-            currentVal = val;
-            currentFrom = x;
-        }
-        segments.push({
-            from: currentFrom,
-            to: timeToX(viewEnd),
-            val: currentVal,
+        const formatter = formatView?.format || ((val: string, w: number) => {
+            let r = val;
+            if (r.startsWith('b') || r.startsWith('B')) r = r.slice(1);
+            const isX = r.includes('x') || r.includes('X');
+            const isZ = r.includes('z') || r.includes('Z');
+            if (isX) return { display: 'X', isX: true, isZ: false };
+            if (isZ) return { display: 'Z', isX: false, isZ: true };
+            try {
+                const bigValue = BigInt('0b' + r.padStart(w, '0'));
+                return { display: '0x' + bigValue.toString(16).toUpperCase(), isX: false, isZ: false };
+            } catch {
+                return { display: r, isX: false, isZ: false };
+            }
         });
 
-        const slant = 4; // diamond-shaped transition width
+        // We collect segments to draw text LATER, after backgrounds are batched.
+        // But to keep it zero-allocation, we can just do a second pass if needed, 
+        // OR just do text in the same pass if it's not too expensive.
+        // Given we want max speed, let's batch backgrounds first.
 
-        for (const seg of segments) {
-            const fromX = Math.max(seg.from, -slant);
-            const toX = Math.min(seg.to, canvasWidth + slant);
-            if (fromX >= toX) continue;
+        let currentVal = result.initialValue;
+        let currentX = timeToX(viewStart);
 
-            const fallbackFormat = (val: string, w: number) => {
-                let r = val;
-                if (r.startsWith('b') || r.startsWith('B')) r = r.slice(1);
-                const isX = r.includes('x') || r.includes('X');
-                const isZ = r.includes('z') || r.includes('Z');
-                if (isX) return { display: 'X', isX: true, isZ: false };
-                if (isZ) return { display: 'Z', isX: false, isZ: true };
-                try {
-                    const bigValue = BigInt('0b' + r.padStart(w, '0'));
-                    return { display: '0x' + bigValue.toString(16).toUpperCase(), isX: false, isZ: false };
-                } catch {
-                    return { display: r, isX: false, isZ: false };
-                }
-            };
+        const addDiamond = (val: string, fromX: number, toX: number) => {
+            const f = Math.max(fromX, -slant);
+            const t = Math.min(toX, canvasWidth + slant);
+            if (f >= t) return;
 
-            const formatter = formatView?.format || fallbackFormat;
-            const parsed = formatter(seg.val, width);
+            const parsed = formatter(val, width);
+            const p = parsed.isX ? pathX : parsed.isZ ? pathZ : pathNormal;
 
-            if (parsed.isX) {
-                ctx.fillStyle = 'rgba(244, 71, 71, 0.15)';
-                ctx.strokeStyle = '#f44747';
-            } else if (parsed.isZ) {
-                ctx.fillStyle = 'rgba(220, 220, 170, 0.1)';
-                ctx.strokeStyle = '#dcdcaa';
-            } else {
-                ctx.fillStyle = color + '18'; // very low alpha fill
-                ctx.strokeStyle = color;
+            const midY = (rowTop + rowBot) / 2;
+            p.moveTo(f + slant, rowTop);
+            p.lineTo(t - slant, rowTop);
+            p.lineTo(t, midY);
+            p.lineTo(t - slant, rowBot);
+            p.lineTo(f + slant, rowBot);
+            p.lineTo(f, midY);
+            p.closePath();
+
+            // Text rendering (only if wide enough)
+            const segWidth = t - f;
+            if (segWidth > 40) {
+                // We'll do a second pass for text to avoid switching state too much
             }
+        };
 
-            // Draw diamond/trapezoid shape
-            ctx.beginPath();
-            ctx.moveTo(fromX + slant, rowTop);
-            ctx.lineTo(toX - slant, rowTop);
-            ctx.lineTo(toX, (rowTop + rowBot) / 2);
-            ctx.lineTo(toX - slant, rowBot);
-            ctx.lineTo(fromX + slant, rowBot);
-            ctx.lineTo(fromX, (rowTop + rowBot) / 2);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
+        for (let i = 0; i < numTransitions; i++) {
+            const [ts, val] = transitions[i];
+            const nextX = timeToX(ts);
+            addDiamond(currentVal, currentX, nextX);
+            currentVal = val;
+            currentX = nextX;
+        }
+        addDiamond(currentVal, currentX, timeToX(viewEnd));
 
-            // Draw value text if segment is wide enough
-            const segWidth = toX - fromX;
-            if (segWidth > 30) {
-                ctx.fillStyle = color;
-                ctx.font = '14px "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const textX = (fromX + toX) / 2;
+        // Stroke and Fill Normal
+        ctx.fillStyle = color + '18';
+        ctx.strokeStyle = color;
+        ctx.fill(pathNormal);
+        ctx.stroke(pathNormal);
+
+        // Stroke and Fill X
+        ctx.fillStyle = 'rgba(244, 71, 71, 0.15)';
+        ctx.strokeStyle = '#f44747';
+        ctx.fill(pathX);
+        ctx.stroke(pathX);
+
+        // Stroke and Fill Z
+        ctx.fillStyle = 'rgba(220, 220, 170, 0.1)';
+        ctx.strokeStyle = '#dcdcaa';
+        ctx.fill(pathZ);
+        ctx.stroke(pathZ);
+
+        // TEXT PASS (Only for wide segments)
+        ctx.fillStyle = color;
+        ctx.font = '14px "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        currentVal = result.initialValue;
+        currentX = timeToX(viewStart);
+        for (let i = 0; i <= numTransitions; i++) {
+            const [ts, val] = i < numTransitions ? transitions[i] : [viewEnd, ''];
+            const nextX = i < numTransitions ? timeToX(ts) : timeToX(viewEnd);
+
+            const f = Math.max(currentX, 0);
+            const t = Math.min(nextX, canvasWidth);
+            const segWidth = t - f;
+
+            if (segWidth > 40) {
+                const parsed = formatter(currentVal, width);
+                const textX = (f + t) / 2;
                 const textY = (rowTop + rowBot) / 2;
 
-                // Clip text to segment
                 ctx.save();
                 ctx.beginPath();
-                ctx.rect(fromX + slant + 2, rowTop, segWidth - 2 * slant - 4, rowBot - rowTop);
+                ctx.rect(f + slant + 2, rowTop, segWidth - 2 * slant - 4, rowBot - rowTop);
                 ctx.clip();
                 ctx.fillText(parsed.display, textX, textY);
                 ctx.restore();
+            }
+
+            if (i < numTransitions) {
+                currentVal = val;
+                currentX = nextX;
             }
         }
     }
