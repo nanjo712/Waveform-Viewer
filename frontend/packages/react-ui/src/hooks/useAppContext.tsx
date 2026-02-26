@@ -88,19 +88,6 @@ export function AppProvider({ adapter, waveformService, autoInitWasm = false, ch
     }, [waveformService, autoInitWasm]);
 
     // ── Query Optimization State ───────────────────────────────────────────
-    const currentDataRangeRef = useRef<{ start: number, end: number, signals: string } | null>(null);
-    const abortControllerRef = useRef<AbortController | null>(null);
-    const lastQueryTimeRef = useRef<number>(0);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    // Cleanup resources on unmount
-    useEffect(() => {
-        return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
-            if (abortControllerRef.current) abortControllerRef.current.abort();
-        };
-    }, []);
-
     // Query waveform data whenever view or visible signals change
     useEffect(() => {
         if (!state.fileLoaded || !waveformService.isFileLoaded || state.visibleRowIndices.length === 0) return;
@@ -108,41 +95,12 @@ export function AppProvider({ adapter, waveformService, autoInitWasm = false, ch
         const w = state.viewEnd - state.viewStart;
         if (w <= 0) return;
 
-        const sigDesc = state.visibleRowIndices.join(',');
-
-        // 1. Spatial Optimization: Prefetching & Padding
-        const cache = currentDataRangeRef.current;
-        if (
-            cache &&
-            cache.signals === sigDesc &&
-            state.viewStart >= cache.start &&
-            state.viewEnd <= cache.end
-        ) {
-            // New view falls completely within our padded buffer, no Wasm query needed!
-            return;
-        }
-
         // We need new data. Calculate padded range (1x width on each side).
         const reqStart = Math.max(0, state.viewStart - w);
         const reqEnd = state.viewEnd + w;
 
-        // 2 & 4. Temporal Optimization & Query Cancellation
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-        }
-        const ac = new AbortController();
-        abortControllerRef.current = ac;
-
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-            timerRef.current = null;
-        }
-
         const executeQuery = async () => {
-            lastQueryTimeRef.current = Date.now();
-
             // Heuristic for LOD: assume the canvas is roughly window.innerWidth in width.
-            // A more exact way would be reading real canvas bounds, but this is a solid approximation.
             const canvasWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
             const pixelTimeStep = w / canvasWidth;
 
@@ -151,7 +109,7 @@ export function AppProvider({ adapter, waveformService, autoInitWasm = false, ch
                     reqStart,
                     reqEnd,
                     state.visibleRowIndices,
-                    ac.signal,
+                    undefined, // AbortSignal no longer needed, managed by Service queue
                     pixelTimeStep,
                     (partialResult) => {
                         // PROGRESSIVE RENDERING: Streaming partial updates directly to canvas
@@ -159,29 +117,20 @@ export function AppProvider({ adapter, waveformService, autoInitWasm = false, ch
                     }
                 );
 
-                if (ac.signal.aborted) return;
-
-                currentDataRangeRef.current = { start: reqStart, end: reqEnd, signals: sigDesc };
                 dispatch({ type: 'SET_QUERY_RESULT', result });
             } catch (err: unknown) {
-                if (err instanceof Error && err.name === 'AbortError') return;
+                if (err instanceof Error && err.name === 'AbortError') {
+                    // This query was kicked out of the Service queue by a newer one.
+                    // This is expected, do nothing.
+                    return;
+                }
                 console.error('Query failed:', err);
             }
         };
 
-        const now = Date.now();
-        const elapsed = now - lastQueryTimeRef.current;
-        const THROTTLE_MS = 60; // Throttling threshold
-
-        if (elapsed >= THROTTLE_MS) {
-            executeQuery();
-        } else {
-            // Debounce for trailing edge
-            timerRef.current = setTimeout(() => {
-                executeQuery();
-            }, THROTTLE_MS - Math.max(0, elapsed));
-        }
-    }, [waveformService, state.fileLoaded, state.viewStart, state.viewEnd, state.visibleRowIndices, dispatch]);
+        // Fire and forget
+        executeQuery();
+    }, [waveformService, state.fileLoaded, state.viewStart, state.viewEnd, state.visibleRowIndices, dispatch, state.queryCounter]);
 
     return (
         <AppContext.Provider value={{ state, dispatch, waveformService, adapter }}>

@@ -22,6 +22,7 @@ export declare class WaveformServiceClient {
     private queryResolve;
     private queryReject;
     private queryProgressCb;
+    private currentQueryId;
     private nextRequestId;
     private pendingRequests;
     constructor(adapter: PlatformAdapter);

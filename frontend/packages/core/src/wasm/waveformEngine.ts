@@ -127,9 +127,12 @@ export class WaveformEngine {
                 transitions: []
             }))
         };
-        let isFirstSlice = true;
+        const CHUNK_SIZE = 10000;
+        const PROGRESS_THROTTLE_MS = 100;
+        let lastProgressTime = 0;
 
-        const flushToRolling = () => {
+        let isFirstSlice = true;
+        const flushToRolling = (forceProgress = false) => {
             const rawResult = parser.flush_query_binary();
             const slice = this.decodeBinaryResult(rawResult, mod, tBegin, tEnd, signalIndices);
 
@@ -150,7 +153,11 @@ export class WaveformEngine {
             isFirstSlice = false;
 
             if (hasNewData && onProgress) {
-                onProgress({ ...rollingResult });
+                const now = Date.now();
+                if (forceProgress || (now - lastProgressTime > PROGRESS_THROTTLE_MS)) {
+                    onProgress({ ...rollingResult });
+                    lastProgressTime = now;
+                }
             }
         };
 
@@ -170,7 +177,7 @@ export class WaveformEngine {
             abortSignal?.removeEventListener('abort', onAbort);
         }
 
-        flushToRolling();
+        flushToRolling(true); // Final forced progress report
         return rollingResult;
     }
 

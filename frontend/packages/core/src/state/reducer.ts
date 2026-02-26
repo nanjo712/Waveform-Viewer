@@ -64,6 +64,9 @@ export interface AppState {
 
     /** The signal currently active for setting UI properties (like format) */
     activeSignalIndex: number | null;
+
+    /** Triggers a force refresh when incremented */
+    queryCounter: number;
 }
 
 export const initialState: AppState = {
@@ -87,6 +90,7 @@ export const initialState: AppState = {
     signalFormats: {},
     formatPlugins: [coreRadixPlugin, coreFloatPlugin],
     activeSignalIndex: null,
+    queryCounter: 0,
 };
 
 // ── Actions ────────────────────────────────────────────────────────────
@@ -116,7 +120,8 @@ export type Action =
     | { type: 'MOVE_SIGNAL'; fromIdx: number; toIdx: number }
     | { type: 'SET_SIGNAL_FORMAT'; index: number; format: string }
     | { type: 'REGISTER_PLUGIN'; plugin: FormatPlugin }
-    | { type: 'SET_ACTIVE_SIGNAL'; index: number | null };
+    | { type: 'SET_ACTIVE_SIGNAL'; index: number | null }
+    | { type: 'FORCE_REFRESH' };
 
 // ── Reducer ────────────────────────────────────────────────────────────
 
@@ -134,9 +139,10 @@ export function appReducer(state: AppState, action: Action): AppState {
             // Default view: show only the last 100 timescale units
             const DEFAULT_VIEW_RANGE = 100;
             const totalRange = tEnd - tBegin;
-            const viewStart = totalRange > DEFAULT_VIEW_RANGE
-                ? tEnd - DEFAULT_VIEW_RANGE
-                : tBegin;
+            const viewStart = tBegin;
+            const viewEnd = totalRange > DEFAULT_VIEW_RANGE
+                ? tBegin + DEFAULT_VIEW_RANGE
+                : tEnd;
             return {
                 ...state,
                 fileLoaded: true,
@@ -147,7 +153,7 @@ export function appReducer(state: AppState, action: Action): AppState {
                 selectedSignals: [],
                 visibleRowIndices: [],
                 viewStart,
-                viewEnd: tEnd,
+                viewEnd,
                 timeBegin: tBegin,
                 timeEnd: tEnd,
                 queryResult: null,
@@ -245,6 +251,9 @@ export function appReducer(state: AppState, action: Action): AppState {
 
         case 'SET_ACTIVE_SIGNAL':
             return { ...state, activeSignalIndex: action.index };
+
+        case 'FORCE_REFRESH':
+            return { ...state, queryCounter: state.queryCounter + 1 };
 
         default:
             return state;

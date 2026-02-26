@@ -21,9 +21,19 @@ export class WaveformServiceClient {
     private _isReady = false;
     private _isFileLoaded = false;
 
-    // Cache to match original behavior
-    private queryCache = new Map<string, QueryResult>();
-    private readonly MAX_CACHE_SIZE = 10;
+    // Queue management for queries
+    private activeQuery: {
+        args: { tBegin: number, tEnd: number, signalIndices: number[], pixelTimeStep: number },
+        onProgress?: (partialResult: QueryResult) => void,
+        resolve: (val: QueryResult) => void,
+        reject: (err: Error) => void
+    } | null = null;
+    private pendingQuery: {
+        args: { tBegin: number, tEnd: number, signalIndices: number[], pixelTimeStep: number },
+        onProgress?: (partialResult: QueryResult) => void,
+        resolve: (val: QueryResult) => void,
+        reject: (err: Error) => void
+    } | null = null;
 
     private initPromise: Promise<void> | null = null;
 
@@ -34,10 +44,6 @@ export class WaveformServiceClient {
     private indexResolve: ((value: boolean) => void) | null = null;
     private indexReject: ((error: Error) => void) | null = null;
     private indexProgressCb: ((bytesRead: number, totalBytes: number) => void) | null = null;
-
-    private queryResolve: ((value: QueryResult) => void) | null = null;
-    private queryReject: ((error: Error) => void) | null = null;
-    private queryProgressCb: ((partialResult: QueryResult) => void) | null = null;
 
     // Generic request callbacks (getMetadata, findSignal, etc.)
     private nextRequestId = 1;
@@ -111,64 +117,27 @@ export class WaveformServiceClient {
         if (!this.worker) throw new Error('Worker not initialized');
         if (!this._isFileLoaded) throw new Error('No file loaded');
 
-        // Check cache
-        const sigDesc = signalIndices.join(',');
-        for (const [key, cached] of this.queryCache.entries()) {
-            const [cSigDesc, cLOD] = key.split('|');
-            if (cSigDesc === sigDesc && cLOD === pixelTimeStep.toString() && cached.tBegin <= tBegin && cached.tEnd >= tEnd) {
-                this.queryCache.delete(key);
-                this.queryCache.set(key, cached);
-                if (onProgress) onProgress(cached);
-                return cached;
-            }
-        }
-
-        // Cancel previous query if any is active (simple strategy)
-        if (this.queryReject) {
-            this.worker.postMessage({ type: 'ABORT_QUERY' } as MainToWorkerMessage);
-            this.queryReject(new Error('Query aborted by new query'));
-            this.cleanupQueryCallbacks();
-        }
-
-        this.queryProgressCb = onProgress || null;
-
-        const onAbort = () => {
-            if (this.worker) this.worker.postMessage({ type: 'ABORT_QUERY' } as MainToWorkerMessage);
-            if (this.queryReject) {
-                const err = new Error('Query aborted');
-                err.name = 'AbortError';
-                this.queryReject(err);
-            }
-            this.cleanupQueryCallbacks();
-        };
-
-        abortSignal?.addEventListener('abort', onAbort);
-
         return new Promise<QueryResult>((resolve, reject) => {
-            this.queryResolve = resolve;
-            this.queryReject = reject;
+            const requestArgs = { tBegin, tEnd, signalIndices, pixelTimeStep };
+            const queryData = { args: requestArgs, resolve, reject, onProgress };
 
-            this.worker!.postMessage({
-                type: 'QUERY',
-                tBegin,
-                tEnd,
-                signalIndices,
-                pixelTimeStep
-            } as MainToWorkerMessage);
-        }).then(result => {
-            abortSignal?.removeEventListener('abort', onAbort);
-
-            const newCacheKey = `${sigDesc}|${pixelTimeStep}|${tBegin}|${tEnd}`;
-            this.queryCache.set(newCacheKey, result);
-            if (this.queryCache.size > this.MAX_CACHE_SIZE) {
-                const firstKey = this.queryCache.keys().next().value;
-                if (firstKey) this.queryCache.delete(firstKey);
+            if (!this.activeQuery) {
+                // No active query, send immediately
+                this.activeQuery = queryData;
+                this.worker!.postMessage({
+                    type: 'QUERY',
+                    ...requestArgs
+                } as MainToWorkerMessage);
+            } else {
+                // There's an active query, put this in pending.
+                // If there's already a pending query, drop it.
+                if (this.pendingQuery) {
+                    const err = new Error('Query superseded by newer request');
+                    err.name = 'AbortError';
+                    this.pendingQuery.reject(err);
+                }
+                this.pendingQuery = queryData;
             }
-
-            return result;
-        }).catch(err => {
-            abortSignal?.removeEventListener('abort', onAbort);
-            throw err;
         });
     }
 
@@ -225,10 +194,14 @@ export class WaveformServiceClient {
         this._isFileLoaded = false;
         if (this.worker) this.worker.postMessage({ type: 'CLOSE' } as MainToWorkerMessage);
         this.file = null;
-        this.queryCache.clear();
+        this.clearCache();
         this._cachedMetadata = null;
         this._cachedSignals = null;
         this._cachedHierarchy = null;
+    }
+
+    clearCache(): void {
+        // No cache essentially
     }
 
     private async sendRpcRequest<T>(type: string, extraArgs: any = {}): Promise<T> {
@@ -278,16 +251,31 @@ export class WaveformServiceClient {
                 break;
 
             case 'QUERY_PROGRESS':
-                if (this.queryProgressCb) this.queryProgressCb(msg.result);
+                if (this.activeQuery && this.activeQuery.onProgress) {
+                    this.activeQuery.onProgress(msg.result);
+                }
                 break;
 
             case 'QUERY_DONE':
-                if (msg.error) {
-                    if (this.queryReject) this.queryReject(new Error(msg.error));
-                } else {
-                    if (this.queryResolve) this.queryResolve(msg.result);
+                if (this.activeQuery) {
+                    if (msg.error) {
+                        this.activeQuery.reject(new Error(msg.error));
+                    } else {
+                        this.activeQuery.resolve(msg.result);
+                    }
+                    this.activeQuery = null;
                 }
-                this.cleanupQueryCallbacks();
+
+                // If there's a pending query, promote it to active and start it
+                if (this.pendingQuery) {
+                    const pq = this.pendingQuery;
+                    this.pendingQuery = null;
+                    this.activeQuery = pq;
+                    this.worker!.postMessage({
+                        type: 'QUERY',
+                        ...pq.args
+                    } as MainToWorkerMessage);
+                }
                 break;
 
             // READ_SLICE_REQUEST handler removed
@@ -305,9 +293,4 @@ export class WaveformServiceClient {
         }
     }
 
-    private cleanupQueryCallbacks() {
-        this.queryResolve = null;
-        this.queryReject = null;
-        this.queryProgressCb = null;
-    }
 }

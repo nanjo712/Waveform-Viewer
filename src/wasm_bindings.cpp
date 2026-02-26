@@ -491,31 +491,54 @@ class FstParserWasm
     {
         if (!ctx_) return;
 
+        pixel_time_step_ = pixel_time_step;
+        query_t_begin_ = start_time;
+        query_t_end_ = end_time;
+
         fstReaderSetLimitTimeRange(ctx_, start_time, end_time);
         fstReaderClrFacProcessMaskAll(ctx_);
 
+        last_emitted_time_.assign(signals_.size(), 0xFFFFFFFFFFFFFFFFULL);
+
+        res_1bit_.clear();
+        res_multi_.clear();
+        string_pool_.clear();
+        query_done_ = false;
+
         auto parsed = json::parse(indicesJSON);
         std::vector<uint32_t> indices = parsed.get<std::vector<uint32_t>>();
+
+        // Initial state restoration: get values at start_time for all queried
+        // signals. Use a reuseable buffer for signal values.
+        std::vector<char> val_buf(65536);
+
         for (uint32_t idx : indices)
         {
             if (idx < signals_.size())
             {
                 fstHandle handle = std::stoull(signals_[idx].id_code);
                 fstReaderSetFacProcessMask(ctx_, handle);
+
+                // Fetch current value at start_time
+                uint32_t width = signals_[idx].width;
+                if (width + 1 > val_buf.size()) val_buf.resize(width + 1);
+
+                char* v = fstReaderGetValueFromHandleAtTime(
+                    ctx_, start_time, handle, val_buf.data());
+                if (v)
+                {
+                    handle_value(start_time, handle,
+                                 reinterpret_cast<const unsigned char*>(v),
+                                 width);
+                }
             }
         }
-
-        res_1bit_.clear();
-        res_multi_.clear();
-        string_pool_.clear();
-        query_done_ = false;
     }
 
     bool query_step(size_t chunk_size)
     {
         if (!ctx_ || query_done_) return false;
 
-        // FST processes the entire queried range and variables in one call.
         fstReaderIterBlocks2(ctx_, fst_callback, fst_callback_varlen, this,
                              nullptr);
 
@@ -553,7 +576,16 @@ class FstParserWasm
     std::vector<vcd::Transition1Bit> res_1bit_;
     std::vector<vcd::TransitionMultiBit> res_multi_;
     std::vector<char> string_pool_;
-    bool query_done_ = false;
+
+    float pixel_time_step_ = -1.0f;
+    std::vector<uint64_t> last_emitted_time_;
+    uint64_t query_t_begin_ = 0;
+    uint64_t query_t_end_ = 0;
+    size_t total_rx_count_ = 0;
+    size_t in_range_count_ = 0;
+    size_t not_in_range_count_ = 0;
+
+    bool query_done_{false};
 
     static void fst_callback(void* user_data, uint64_t time, fstHandle facidx,
                              const unsigned char* value)
@@ -573,15 +605,31 @@ class FstParserWasm
     void handle_value(uint64_t time, fstHandle facidx,
                       const unsigned char* value, uint32_t len)
     {
+        if (time < query_t_begin_ || time > query_t_end_) return;
+
         auto it = handle_to_sig_.find(facidx);
         if (it == handle_to_sig_.end()) return;
         uint32_t sig_idx = it->second;
 
+        // LOD Downsampling
+        if (pixel_time_step_ > 0.0f &&
+            last_emitted_time_[sig_idx] != 0xFFFFFFFFFFFFFFFFULL)
+        {
+            if ((time - last_emitted_time_[sig_idx]) <
+                static_cast<uint64_t>(pixel_time_step_))
+            {
+                return;
+            }
+        }
+
+        in_range_count_++;
+        last_emitted_time_[sig_idx] = time;
+
+        const vcd::SignalDef& sig = signals_[sig_idx];
+
         if (len == 0)
             len = static_cast<uint32_t>(
                 std::strlen(reinterpret_cast<const char*>(value)));
-
-        const vcd::SignalDef& sig = signals_[sig_idx];
 
         if (sig.width == 1)
         {

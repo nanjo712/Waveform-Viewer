@@ -67,7 +67,7 @@ const DPR = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
 // ── Component ──────────────────────────────────────────────────────
 
 export function WaveformCanvas() {
-    const { state, dispatch } = useAppContext();
+    const { state, dispatch, waveformService } = useAppContext();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const signalNamesRef = useRef<HTMLDivElement>(null);
@@ -176,20 +176,59 @@ export function WaveformCanvas() {
 
         ctx.scale(DPR, DPR);
 
-        // Clear
-        ctx.fillStyle = '#1e1e1e';
-        ctx.fillRect(0, 0, w, h);
-
         const viewStart = state.viewStart;
         const viewEnd = state.viewEnd;
         const viewRange = viewEnd - viewStart;
         if (viewRange <= 0) return;
 
         const timeToX = (t: number) => ((t - viewStart) / viewRange) * w;
+        const timelineY = HEADER_HEIGHT;
+
+        // ── Draw background for stale data areas ──
+        if (state.queryResult) {
+            const resultBegin = state.queryResult.tBegin;
+            const resultEnd = state.queryResult.tEnd;
+
+            // Compute pixel coordinates of areas outside the current query result
+            let leftX = 0;
+            let leftW = 0;
+            let rightX = 0;
+            let rightW = 0;
+
+            if (viewStart < resultBegin) {
+                leftW = timeToX(Math.min(resultBegin, viewEnd));
+            }
+            if (viewEnd > resultEnd) {
+                rightX = timeToX(Math.max(resultEnd, viewStart));
+                rightW = w - rightX;
+            }
+
+            // Draw slanted stripes for "stale" or "loading" areas
+            if (leftW > 0 || rightW > 0) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                if (leftW > 0) ctx.rect(leftX, timelineY + TIMELINE_HEIGHT, leftW, h - (timelineY + TIMELINE_HEIGHT));
+                if (rightW > 0) ctx.rect(rightX, timelineY + TIMELINE_HEIGHT, rightW, h - (timelineY + TIMELINE_HEIGHT));
+                ctx.clip();
+
+                // Draw stripes across the whole canvas, relying on clip
+                for (let i = -h; i < w; i += 20) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, h);
+                    ctx.lineTo(i + h, 0);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+        }
+
+        // Clear only behind the waveform area (if not drawing stripes everywhere)
+        // (Handled by the initial clear and the stripes rendering above)
 
         // ── Draw timeline axis ────────────────────────────────────
-
-        const timelineY = HEADER_HEIGHT;
         ctx.fillStyle = '#252526';
         ctx.fillRect(0, 0, w, timelineY + TIMELINE_HEIGHT);
 
@@ -775,10 +814,45 @@ export function WaveformCanvas() {
     return (
         <div className="waveform-panel">
             <div className="waveform-toolbar">
-                <span className="time-info">
-                    View: {formatTime(state.viewStart, unit)} -{' '}
-                    {formatTime(state.viewEnd, unit)}
-                </span>
+                <div className="time-jump-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span className="time-info" style={{ marginRight: '4px' }}>View:</span>
+                    <input
+                        type="number"
+                        className="time-input"
+                        title="Start Time"
+                        value={state.viewStart}
+                        onChange={(e) => {
+                            const val = Number(e.target.value);
+                            if (!isNaN(val)) dispatch({ type: 'SET_VIEW', start: val, end: state.viewEnd });
+                        }}
+                        style={{ width: '80px', padding: '2px 4px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '3px' }}
+                    />
+                    <span>-</span>
+                    <input
+                        type="number"
+                        className="time-input"
+                        title="End Time"
+                        value={state.viewEnd}
+                        onChange={(e) => {
+                            const val = Number(e.target.value);
+                            if (!isNaN(val)) dispatch({ type: 'SET_VIEW', start: state.viewStart, end: val });
+                        }}
+                        style={{ width: '80px', padding: '2px 4px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-primary)', borderRadius: '3px' }}
+                    />
+                    <span className="time-unit" style={{ marginRight: '8px', color: 'var(--text-muted)' }}>{unit}</span>
+                    <button
+                        className="btn btn-icon"
+                        title="Force Refresh Data"
+                        onClick={() => {
+                            if (typeof waveformService.clearCache === 'function') {
+                                waveformService.clearCache();
+                            }
+                            dispatch({ type: 'FORCE_REFRESH' });
+                        }}
+                    >
+                        &#x21bb;
+                    </button>
+                </div>
 
                 {state.activeSignalIndex !== null && state.signals[state.activeSignalIndex] && state.signals[state.activeSignalIndex].width > 1 && (
                     <div className="active-signal-format">

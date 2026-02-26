@@ -10,6 +10,7 @@ export type MainToWorkerMessage = {
     fileSize: number;
 } | {
     type: 'QUERY';
+    queryId: number;
     tBegin: number;
     tEnd: number;
     signalIndices: number[];
@@ -20,6 +21,7 @@ export type MainToWorkerMessage = {
     buffer: ArrayBuffer;
 } | {
     type: 'ABORT_QUERY';
+    queryId: number;
 } | {
     type: 'GET_METADATA';
     requestId: number;
@@ -50,9 +52,11 @@ export type WorkerToMainMessage = {
     error?: string;
 } | {
     type: 'QUERY_PROGRESS';
+    queryId: number;
     result: QueryResult;
 } | {
     type: 'QUERY_DONE';
+    queryId: number;
     result: QueryResult;
     error?: string;
 } | {
