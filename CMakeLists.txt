@@ -133,6 +133,9 @@ if(EMSCRIPTEN)
         SUFFIX ".js"
         RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/wasm"
     )
+
+    target_compile_options(fst PRIVATE -s USE_ZLIB=1)
+    target_compile_options(vcd_parser PRIVATE -s USE_ZLIB=1)
 else()
     # =========================================================================
     # Native build: static library + CLI viewer

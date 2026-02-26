@@ -21,6 +21,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zlib1g-dev libbz2-dev
+
       - name: Setup emscripten
         uses: mymindstorm/setup-emsdk@v14
 
