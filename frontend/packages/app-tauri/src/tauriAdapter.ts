@@ -78,17 +78,19 @@ export class TauriPlatformAdapter implements PlatformAdapter {
     }
 
     getWasmConfig(): { jsUri: string; binaryUri?: string } {
-        const origin = window.location.origin;
+        // Use relative path logic to support subdirectories (if applicable to Tauri webviews)
+        const baseUrl = new URL('.', window.location.href).href;
         return {
-            jsUri: `${origin}/wasm/vcd_parser.js`,
-            binaryUri: `${origin}/wasm/vcd_parser.wasm`
+            jsUri: new URL('wasm/vcd_parser.js', baseUrl).href,
+            binaryUri: new URL('wasm/vcd_parser.wasm', baseUrl).href
         };
     }
 
     async loadWasmModule(): Promise<VcdParserModule> {
         if (!modulePromise) {
             modulePromise = (async () => {
-                await loadScript('./wasm/vcd_parser.js');
+                const config = this.getWasmConfig();
+                await loadScript(config.jsUri);
                 const createFn = globalThis.createVcdParser;
                 if (!createFn) {
                     throw new Error('createVcdParser not found on globalThis after loading script');
