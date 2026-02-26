@@ -724,16 +724,18 @@ body,
 /* ── Resize handle ─────────────────────────────────────────────────── */
 
 .resize-handle {
-    width: 4px;
+    width: 3px;
     cursor: col-resize;
-    background: transparent;
+    background: var(--border-color);
     flex-shrink: 0;
-    transition: background 0.15s;
+    transition: background 0.1s, width 0.1s;
+    z-index: 10;
 }
 
 .resize-handle:hover,
 .resize-handle.active {
     background: var(--accent);
+    width: 4px;
 }
 
 /* ── UI Enhancements ──────────────────────────────────────────── */

@@ -117,6 +117,7 @@ interface SidebarContentProps {
     metadata: WaveformMetadata | null;
     fileLoaded: boolean;
     dispatch: any;
+    width: number;
 }
 
 const SidebarContent = memo(({
@@ -128,7 +129,8 @@ const SidebarContent = memo(({
     sidebarCollapsed,
     metadata,
     fileLoaded,
-    dispatch
+    dispatch,
+    width
 }: SidebarContentProps) => {
     const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
     const [initialized, setInitialized] = useState(false);
@@ -256,7 +258,7 @@ const SidebarContent = memo(({
                             &#9654;
                         </span>
                         <span className="tree-icon scope">&#128193;</span>
-                        <span className="tree-label">{node.name}</span>
+                        <span className="tree-label" style={{ overflow: 'visible', textOverflow: 'clip' }}>{node.name}</span>
                         {node.signals && node.signals.length > 0 && (
                             <span className="tree-badge">{node.signals.length}</span>
                         )}
@@ -283,7 +285,7 @@ const SidebarContent = memo(({
                         readOnly
                     />
                     <span className="tree-icon signal">&#9632;</span>
-                    <span className="tree-label">{name}</span>
+                    <span className="tree-label" style={{ overflow: 'visible', textOverflow: 'clip' }}>{name}</span>
                     <span className="tree-badge">
                         {sig.type}
                         {sig.width > 1 ? ` [${sig.msb ?? sig.width - 1}:${sig.lsb ?? 0}]` : ''}
@@ -294,7 +296,10 @@ const SidebarContent = memo(({
     }, [items, expandedNodes, selectedSet, signals, selectedSignals, handleToggleExpand, handleToggleScope, handleToggleSignal]);
 
     return (
-        <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <div
+            className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}
+            style={!sidebarCollapsed ? { width: 'var(--sidebar-width)' } : {}}
+        >
             <div className="sidebar-header">
                 <h2>Signal Explorer</h2>
             </div>
@@ -322,13 +327,13 @@ const SidebarContent = memo(({
                         />
                     </div>
 
-                    <div className="signal-tree" ref={containerRef} style={{ flex: 1, minHeight: 0 }}>
+                    <div className="signal-tree" ref={containerRef} style={{ flex: 1, minHeight: 0, overflowX: 'auto' }}>
                         {items.length > 0 ? (
                             <List
                                 rowCount={items.length}
                                 rowHeight={24}
                                 rowProps={{}}
-                                style={{ height: treeHeight, width: '100%' }}
+                                style={{ height: treeHeight, width: 'max-content', minWidth: '100%' }}
                                 rowComponent={Row}
                             />
                         ) : (
@@ -389,7 +394,7 @@ const SidebarContent = memo(({
 
 // ── Sidebar Container ───────────────────────────────────────────
 
-export function Sidebar() {
+export function Sidebar({ width }: { width: number }) {
     const { state, dispatch } = useAppContext();
 
     // Only pass necessary props to ensure SidebarContent only re-renders when relevant data changes.
@@ -405,6 +410,7 @@ export function Sidebar() {
             metadata={state.metadata}
             fileLoaded={state.fileLoaded}
             dispatch={dispatch}
+            width={width}
         />
     );
 }
