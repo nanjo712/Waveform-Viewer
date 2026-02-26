@@ -385,7 +385,7 @@ export function WaveformCanvas() {
         // For simplicity, we start with High and Low which share the same color.
 
         let currentVal = result.initialValue;
-        let currentX = timeToX(viewStart);
+        let segmentStartX = timeToX(viewStart);
 
         // We use separate paths for bit 0, bit 1, unknown (X), and High-Z (Z)
         const path0 = new Path2D();
@@ -418,14 +418,17 @@ export function WaveformCanvas() {
             }
         };
 
+
         for (let i = 0; i < numTransitions; i++) {
             const [ts, val] = transitions[i];
+            if (val === currentVal) continue; // Coalesce identical values
+
             const nextX = timeToX(ts);
-            addSegment(currentVal, currentX, nextX);
+            addSegment(currentVal, segmentStartX, nextX);
             currentVal = val;
-            currentX = nextX;
+            segmentStartX = nextX;
         }
-        addSegment(currentVal, currentX, timeToX(viewEnd));
+        addSegment(currentVal, segmentStartX, timeToX(viewEnd));
 
         // 2. Stroke the batched paths
         ctx.setLineDash([]);
@@ -453,14 +456,14 @@ export function WaveformCanvas() {
         let prevVal = result.initialValue;
         for (let i = 0; i < numTransitions; i++) {
             const [ts, val] = transitions[i];
+            if (val === prevVal) continue; // No vertical line if value hasn't changed
+
             const x = timeToX(ts);
 
             if (x >= 0 && x <= canvasWidth) {
                 const b1 = parseBitValue(prevVal);
                 const b2 = parseBitValue(val);
 
-                // If either is a glitch, we don't necessarily need a vertical line 
-                // but let's draw it if it's a boundary to a normal state
                 if (b1 !== -3 && b2 !== -3) {
                     const y1 = b1 === 1 ? rowTop : b1 === 0 ? rowBot : rowMid;
                     const y2 = b2 === 1 ? rowTop : b2 === 0 ? rowBot : rowMid;
@@ -470,7 +473,7 @@ export function WaveformCanvas() {
                     // Transition exit from glitch
                     const y2 = b2 === 1 ? rowTop : b2 === 0 ? rowBot : rowMid;
                     pathTrans.moveTo(x, rowTop);
-                    pathTrans.lineTo(x, rowBot); // Full height for glitch boundary
+                    pathTrans.lineTo(x, rowBot);
                 } else if (b1 !== -3 && b2 === -3) {
                     // Transition entry to glitch
                     pathTrans.moveTo(x, rowTop);
@@ -533,7 +536,7 @@ export function WaveformCanvas() {
         // Given we want max speed, let's batch backgrounds first.
 
         let currentVal = result.initialValue;
-        let currentX = timeToX(viewStart);
+        let segmentStartX = timeToX(viewStart);
 
         const addDiamond = (val: string, fromX: number, toX: number) => {
             const f = Math.max(fromX, -slant);
@@ -579,14 +582,17 @@ export function WaveformCanvas() {
             }
         };
 
+
         for (let i = 0; i < numTransitions; i++) {
             const [ts, val] = transitions[i];
+            if (val === currentVal) continue; // Coalesce identical values
+
             const nextX = timeToX(ts);
-            addDiamond(currentVal, currentX, nextX);
+            addDiamond(currentVal, segmentStartX, nextX);
             currentVal = val;
-            currentX = nextX;
+            segmentStartX = nextX;
         }
-        addDiamond(currentVal, currentX, timeToX(viewEnd));
+        addDiamond(currentVal, segmentStartX, timeToX(viewEnd));
 
         // Stroke and Fill Normal
         ctx.fillStyle = color + '18';
@@ -612,19 +618,23 @@ export function WaveformCanvas() {
         ctx.fill(pathG);
         ctx.stroke(pathG);
 
-        // TEXT PASS (Only for wide segments)
+        // TEXT PASS (Coalesced)
         ctx.fillStyle = color;
         ctx.font = '14px "Cascadia Code", "Fira Code", "JetBrains Mono", Consolas, "Courier New", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
         currentVal = result.initialValue;
-        currentX = timeToX(viewStart);
+        segmentStartX = timeToX(viewStart);
+
         for (let i = 0; i <= numTransitions; i++) {
             const [ts, val] = i < numTransitions ? transitions[i] : [viewEnd, ''];
-            const nextX = i < numTransitions ? timeToX(ts) : timeToX(viewEnd);
 
-            const f = Math.max(currentX, 0);
+            // Wait until value changes or end of view to draw text
+            if (i < numTransitions && val === currentVal) continue;
+
+            const nextX = i < numTransitions ? timeToX(ts) : timeToX(viewEnd);
+            const f = Math.max(segmentStartX, 0);
             const t = Math.min(nextX, canvasWidth);
             const segWidth = t - f;
 
@@ -643,7 +653,7 @@ export function WaveformCanvas() {
 
             if (i < numTransitions) {
                 currentVal = val;
-                currentX = nextX;
+                segmentStartX = nextX;
             }
         }
     }
@@ -966,7 +976,21 @@ export function WaveformCanvas() {
                     </div>
                 )}
 
-                <div className="zoom-controls">
+                <div className="zoom-controls" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="lod-control" style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '8px' }}>
+                        <span style={{ fontSize: '12px', opacity: 0.7, whiteSpace: 'nowrap' }}>LOD:</span>
+                        <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            step="0.5"
+                            value={state.lodPixelFactor}
+                            onChange={(e) => dispatch({ type: 'SET_LOD_FACTOR', factor: parseFloat(e.target.value) })}
+                            style={{ width: '60px', height: '14px', margin: 0, padding: 0 }}
+                            title="LOD Detail (Higher = more aggregation)"
+                        />
+                        <span style={{ fontSize: '11px', minWidth: '24px', opacity: 0.8 }}>{state.lodPixelFactor.toFixed(1)}x</span>
+                    </div>
                     <button className="btn btn-icon" onClick={handleZoomIn} title="Zoom In">+</button>
                     <button className="btn btn-icon" onClick={handleZoomOut} title="Zoom Out">-</button>
                     <button className="btn btn-icon" onClick={handleZoomFit} title="Fit All">[ ]</button>

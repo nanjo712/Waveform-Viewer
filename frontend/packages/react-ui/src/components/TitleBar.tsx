@@ -72,21 +72,6 @@ export function TitleBar() {
                 </span>
             </div>
             <div className="titlebar-right">
-                {state.fileLoaded && (
-                    <div className="lod-control" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '16px' }}>
-                        <span style={{ fontSize: '12px', opacity: 0.8 }}>LOD Detail:</span>
-                        <input
-                            type="range"
-                            min="1"
-                            max="5"
-                            step="0.5"
-                            value={state.lodPixelFactor}
-                            onChange={(e) => dispatch({ type: 'SET_LOD_FACTOR', factor: parseFloat(e.target.value) })}
-                            style={{ width: '80px' }}
-                        />
-                        <span style={{ fontSize: '12px', minWidth: '20px' }}>{state.lodPixelFactor.toFixed(1)}x</span>
-                    </div>
-                )}
                 {loading && <span style={{ color: 'var(--text-warning)' }}>Indexing...</span>}
                 <button
                     className="btn"
