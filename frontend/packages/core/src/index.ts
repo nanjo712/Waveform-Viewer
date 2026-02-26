@@ -8,9 +8,10 @@ export type {
     QueryPlan,
     QueryResultBinaryRaw,
     VcdParser,
-    VcdParserModule,
-    VcdMetadata,
-} from './types/vcd.ts';
+    FstParser,
+    WaveformParserModule,
+    WaveformMetadata,
+} from './types/waveform.ts';
 
 export type {
     FormatView,
@@ -33,7 +34,7 @@ export type {
 } from './state/reducer.ts';
 
 // ── Services ───────────────────────────────────────────────────────────
-export { VcdServiceClient as VcdService } from './wasm/vcdServiceClient.ts';
+export { WaveformServiceClient as WaveformService } from './wasm/waveformServiceClient.ts';
 
 // ── Plugins ────────────────────────────────────────────────────────────
 export { coreRadixPlugin } from './plugins/coreRadixPlugin.ts';

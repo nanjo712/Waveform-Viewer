@@ -1,4 +1,4 @@
-import type { ScopeNode, SignalDef } from '../types/vcd.ts';
+import type { ScopeNode, SignalDef } from '../types/waveform.ts';
 export declare function unflattenChisel(node: ScopeNode, signals: SignalDef[]): ScopeNode;
 /** Display metadata for a signal in the waveform list under Chisel mode. */
 export interface SignalDisplayInfo {

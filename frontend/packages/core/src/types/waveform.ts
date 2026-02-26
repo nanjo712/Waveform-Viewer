@@ -110,8 +110,11 @@ export interface VcdParser {
     findSignal(fullPath: string): number;
 }
 
-export interface VcdParserModule {
+export interface FstParser extends VcdParser { }
+
+export interface WaveformParserModule {
     VcdParser: new () => VcdParser;
+    FstParser: new () => FstParser;
     /** WASM linear memory (for reading binary query results) */
     HEAPU8: Uint8Array;
     /** Emscripten File System API */
@@ -119,7 +122,7 @@ export interface VcdParserModule {
     FS: any;
 }
 
-export interface VcdMetadata {
+export interface WaveformMetadata {
     date: string;
     version: string;
     timescaleMagnitude: number;

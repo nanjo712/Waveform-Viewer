@@ -6,17 +6,17 @@
  */
 
 import * as vscode from 'vscode';
-import { VcdEditorProvider } from './VcdEditorProvider.ts';
+import { WaveformEditorProvider } from './WaveformEditorProvider.ts';
 import { StatusBarManager } from './StatusBarManager.ts';
 import type { HostToWebviewMessage } from './protocol.ts';
 
 export function activate(context: vscode.ExtensionContext) {
-    const editorProvider = new VcdEditorProvider(context.extensionUri);
+    const editorProvider = new WaveformEditorProvider(context.extensionUri);
 
-    // Register custom editor for .vcd files
+    // Register custom editor for .vcd and .fst files
     context.subscriptions.push(
         vscode.window.registerCustomEditorProvider(
-            VcdEditorProvider.viewType,
+            WaveformEditorProvider.viewType,
             editorProvider,
             {
                 webviewOptions: { retainContextWhenHidden: true },

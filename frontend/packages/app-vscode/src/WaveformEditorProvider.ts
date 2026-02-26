@@ -1,8 +1,8 @@
 /**
- * VcdEditorProvider — CustomReadonlyEditorProvider for .vcd files.
+ * WaveformEditorProvider — CustomReadonlyEditorProvider for .vcd and .fst files.
  *
  * Responsibilities:
- * - Create webview panel when a .vcd file is opened
+ * - Create webview panel when a waveform file is opened
  * - Read file chunks from disk and send to webview via postMessage
  * - Relay signal tree interactions from host to webview
  * - Receive state updates from webview for TreeView / StatusBar
@@ -16,8 +16,8 @@ import type {
     WebviewStateSnapshot,
 } from './protocol.ts';
 
-export class VcdEditorProvider implements vscode.CustomReadonlyEditorProvider {
-    public static readonly viewType = 'waveformViewer.vcdEditor';
+export class WaveformEditorProvider implements vscode.CustomReadonlyEditorProvider {
+    public static readonly viewType = 'waveformViewer.waveformEditor';
 
     /** Currently active state snapshot from the webview */
     private _stateSnapshot: WebviewStateSnapshot | null = null;
@@ -156,7 +156,7 @@ export class VcdEditorProvider implements vscode.CustomReadonlyEditorProvider {
                     const stat = await vscode.workspace.fs.stat(pendingUri);
                     const fileOpenedMsg: HostToWebviewMessage = {
                         type: 'fileOpened',
-                        fileName: pendingUri.path.split('/').pop() ?? 'unknown.vcd',
+                        fileName: pendingUri.path.split('/').pop() ?? 'unknown.waveform',
                         fileSize: stat.size,
                     };
                     pendingWebview.postMessage(fileOpenedMsg);

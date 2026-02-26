@@ -8,7 +8,7 @@
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { VcdService } from '@waveform-viewer/core';
+import { WaveformService } from '@waveform-viewer/core';
 import type { PlatformAdapter, Action, AppState } from '@waveform-viewer/core';
 import { AppProvider } from '@waveform-viewer/react-ui';
 import { WaveformView } from './WaveformView.tsx';
@@ -26,7 +26,7 @@ import type { HostToWebviewMessage, WebviewStateSnapshot } from '../protocol.ts'
 // ── Setup ──────────────────────────────────────────────────────────
 
 const adapter: PlatformAdapter = new VscodePlatformAdapter();
-const vcdService = new VcdService(adapter);
+const waveformService = new WaveformService(adapter);
 
 // ── React rendering ────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useAppContext } from '@waveform-viewer/react-ui';
 
 function WaveformViewWithBridge() {
-    const { state, dispatch, vcdService: svc } = useAppContext();
+    const { state, dispatch, waveformService: svc } = useAppContext();
     const prevStateRef = useRef<string>('');
 
     // ── Handle messages from extension host ────────────────────────
@@ -88,7 +88,7 @@ function WaveformViewWithBridge() {
                         } else {
                             postToHost({
                                 type: 'error',
-                                message: `Failed to parse VCD file: ${msg.fileName}`,
+                                message: `Failed to parse waveform file: ${msg.fileName}`,
                             });
                         }
                     } catch (err) {
@@ -179,7 +179,7 @@ function WaveformViewWithBridge() {
 
 root.render(
     <StrictMode>
-        <AppProvider adapter={adapter} vcdService={vcdService}>
+        <AppProvider adapter={adapter} waveformService={waveformService}>
             <WaveformViewWithBridge />
         </AppProvider>
     </StrictMode>,

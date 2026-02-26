@@ -6,7 +6,7 @@ import { StatusBar } from './StatusBar.tsx';
 import { useAppContext } from '../hooks/useAppContext.tsx';
 
 function App() {
-    const { state, dispatch, vcdService, adapter } = useAppContext();
+    const { state, dispatch, waveformService, adapter } = useAppContext();
     const [isDragging, setIsDragging] = useState(false);
     const [isLoadingFile, setIsLoadingFile] = useState(false);
 
@@ -45,11 +45,11 @@ function App() {
 
         setIsLoadingFile(true);
         try {
-            const ok = await vcdService.indexFile(file);
+            const ok = await waveformService.indexFile(file);
             if (ok) {
-                const metadata = await vcdService.getMetadata();
-                const signals = await vcdService.getSignals();
-                const hierarchy = await vcdService.getHierarchy();
+                const metadata = await waveformService.getMetadata();
+                const signals = await waveformService.getSignals();
+                const hierarchy = await waveformService.getHierarchy();
                 dispatch({
                     type: 'FILE_LOADED',
                     metadata,
@@ -65,7 +65,7 @@ function App() {
         } finally {
             setIsLoadingFile(false);
         }
-    }, [dispatch, vcdService, adapter]);
+    }, [dispatch, waveformService, adapter]);
 
     if (state.wasmStatus === 'loading') {
         return (

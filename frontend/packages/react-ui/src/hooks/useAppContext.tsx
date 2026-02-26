@@ -20,7 +20,7 @@ import {
 import {
     appReducer,
     initialState,
-    VcdService,
+    WaveformService,
 } from '@waveform-viewer/core';
 import type {
     AppState,
@@ -34,7 +34,7 @@ import type {
 export interface AppContextValue {
     state: AppState;
     dispatch: Dispatch<Action>;
-    vcdService: VcdService;
+    waveformService: WaveformService;
     adapter: PlatformAdapter;
 }
 
@@ -51,12 +51,12 @@ export function useAppContext(): AppContextValue {
 
 export interface AppProviderProps {
     adapter: PlatformAdapter;
-    vcdService: VcdService;
+    waveformService: WaveformService;
     autoInitWasm?: boolean;
     children: ReactNode;
 }
 
-export function AppProvider({ adapter, vcdService, autoInitWasm = false, children }: AppProviderProps) {
+export function AppProvider({ adapter, waveformService, autoInitWasm = false, children }: AppProviderProps) {
     const [state, dispatch] = useReducer(appReducer, initialState);
 
     // Bind window.WaveformViewer globally so plugins can register themselves
@@ -76,7 +76,7 @@ export function AppProvider({ adapter, vcdService, autoInitWasm = false, childre
     useEffect(() => {
         if (!autoInitWasm) return;
 
-        vcdService
+        waveformService
             .init()
             .then(() => dispatch({ type: 'WASM_READY' }))
             .catch((err: unknown) =>
@@ -85,7 +85,7 @@ export function AppProvider({ adapter, vcdService, autoInitWasm = false, childre
                     error: err instanceof Error ? err.message : String(err),
                 })
             );
-    }, [vcdService, autoInitWasm]);
+    }, [waveformService, autoInitWasm]);
 
     // ── Query Optimization State ───────────────────────────────────────────
     const currentDataRangeRef = useRef<{ start: number, end: number, signals: string } | null>(null);
@@ -103,7 +103,7 @@ export function AppProvider({ adapter, vcdService, autoInitWasm = false, childre
 
     // Query waveform data whenever view or visible signals change
     useEffect(() => {
-        if (!state.fileLoaded || !vcdService.isFileLoaded || state.visibleRowIndices.length === 0) return;
+        if (!state.fileLoaded || !waveformService.isFileLoaded || state.visibleRowIndices.length === 0) return;
 
         const w = state.viewEnd - state.viewStart;
         if (w <= 0) return;
@@ -147,7 +147,7 @@ export function AppProvider({ adapter, vcdService, autoInitWasm = false, childre
             const pixelTimeStep = w / canvasWidth;
 
             try {
-                const result = await vcdService.query(
+                const result = await waveformService.query(
                     reqStart,
                     reqEnd,
                     state.visibleRowIndices,
@@ -181,10 +181,10 @@ export function AppProvider({ adapter, vcdService, autoInitWasm = false, childre
                 executeQuery();
             }, THROTTLE_MS - Math.max(0, elapsed));
         }
-    }, [vcdService, state.fileLoaded, state.viewStart, state.viewEnd, state.visibleRowIndices, dispatch]);
+    }, [waveformService, state.fileLoaded, state.viewStart, state.viewEnd, state.visibleRowIndices, dispatch]);
 
     return (
-        <AppContext.Provider value={{ state, dispatch, vcdService, adapter }}>
+        <AppContext.Provider value={{ state, dispatch, waveformService, adapter }}>
             {children}
         </AppContext.Provider>
     );

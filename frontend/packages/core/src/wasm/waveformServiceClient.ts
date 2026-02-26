@@ -1,19 +1,19 @@
 /**
- * VcdServiceClient — Proxy for VcdEngine running in a Web Worker.
+ * WaveformServiceClient — Proxy for WaveformEngine running in a Web Worker.
  * Exposes the same public API as the original VcdService, so UI components
  * do not need to change.
  */
 
 import type {
-    VcdMetadata,
+    WaveformMetadata,
     SignalDef,
     ScopeNode,
     QueryResult,
-} from '../types/vcd.ts';
+} from '../types/waveform.ts';
 import type { PlatformAdapter, PlatformFile } from '../types/platform.ts';
 import type { MainToWorkerMessage, WorkerToMainMessage } from '../worker/protocol.ts';
 
-export class VcdServiceClient {
+export class WaveformServiceClient {
     private worker: Worker | null = null;
     private adapter: PlatformAdapter;
     private file: PlatformFile | null = null;
@@ -174,8 +174,8 @@ export class VcdServiceClient {
 
     // --- Metadata Accessors (using RPC style) ---
 
-    async getMetadata(): Promise<VcdMetadata> {
-        return this.sendRpcRequest<VcdMetadata>('GET_METADATA');
+    async getMetadata(): Promise<WaveformMetadata> {
+        return this.sendRpcRequest<WaveformMetadata>('GET_METADATA');
     }
 
     async getSignals(): Promise<SignalDef[]> {
@@ -193,11 +193,11 @@ export class VcdServiceClient {
     // For backwards compatibility and synchronous needs in React.
     // In a worker setup, we might need to pre-fetch these when index finishes.
     // For now, these will throw if not pre-fetched, but we'll try to provide them.
-    private _cachedMetadata: VcdMetadata | null = null;
+    private _cachedMetadata: WaveformMetadata | null = null;
     private _cachedSignals: SignalDef[] | null = null;
     private _cachedHierarchy: ScopeNode | null = null;
 
-    getMetadataSync(): VcdMetadata {
+    getMetadataSync(): WaveformMetadata {
         if (!this._cachedMetadata) throw new Error('Metadata not loaded yet');
         return this._cachedMetadata;
     }

@@ -6,19 +6,19 @@
  * and passed in as props to <AppProvider>.
  */
 import { type ReactNode, type Dispatch } from 'react';
-import { VcdService } from '@waveform-viewer/core';
+import { WaveformService } from '@waveform-viewer/core';
 import type { AppState, Action, PlatformAdapter } from '@waveform-viewer/core';
 export interface AppContextValue {
     state: AppState;
     dispatch: Dispatch<Action>;
-    vcdService: VcdService;
+    waveformService: WaveformService;
     adapter: PlatformAdapter;
 }
 export declare function useAppContext(): AppContextValue;
 export interface AppProviderProps {
     adapter: PlatformAdapter;
-    vcdService: VcdService;
+    waveformService: WaveformService;
     autoInitWasm?: boolean;
     children: ReactNode;
 }
-export declare function AppProvider({ adapter, vcdService, autoInitWasm, children }: AppProviderProps): import("react/jsx-runtime").JSX.Element;
+export declare function AppProvider({ adapter, waveformService, autoInitWasm, children }: AppProviderProps): import("react/jsx-runtime").JSX.Element;

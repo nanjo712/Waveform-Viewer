@@ -1,4 +1,4 @@
-import type { QueryResult } from '../types/vcd.ts';
+import type { QueryResult } from '../types/waveform.ts';
 
 export type MainToWorkerMessage =
     | { type: 'INIT'; wasmJsUri: string; wasmBinaryUri?: string }

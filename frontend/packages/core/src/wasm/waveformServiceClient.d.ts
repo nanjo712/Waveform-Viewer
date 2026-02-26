@@ -1,11 +1,11 @@
 /**
- * VcdServiceClient — Proxy for VcdEngine running in a Web Worker.
+ * WaveformServiceClient — Proxy for WaveformEngine running in a Web Worker.
  * Exposes the same public API as the original VcdService, so UI components
  * do not need to change.
  */
-import type { VcdMetadata, SignalDef, ScopeNode, QueryResult } from '../types/vcd.ts';
+import type { WaveformMetadata, SignalDef, ScopeNode, QueryResult } from '../types/waveform.ts';
 import type { PlatformAdapter, PlatformFile } from '../types/platform.ts';
-export declare class VcdServiceClient {
+export declare class WaveformServiceClient {
     private worker;
     private adapter;
     private file;
@@ -30,14 +30,14 @@ export declare class VcdServiceClient {
     get isFileLoaded(): boolean;
     indexFile(file: PlatformFile, onProgress?: (bytesRead: number, totalBytes: number) => void): Promise<boolean>;
     query(tBegin: number, tEnd: number, signalIndices: number[], abortSignal?: AbortSignal, pixelTimeStep?: number, onProgress?: (partialResult: QueryResult) => void): Promise<QueryResult>;
-    getMetadata(): Promise<VcdMetadata>;
+    getMetadata(): Promise<WaveformMetadata>;
     getSignals(): Promise<SignalDef[]>;
     getHierarchy(): Promise<ScopeNode>;
     findSignal(fullPath: string): Promise<number>;
     private _cachedMetadata;
     private _cachedSignals;
     private _cachedHierarchy;
-    getMetadataSync(): VcdMetadata;
+    getMetadataSync(): WaveformMetadata;
     getSignalsSync(): SignalDef[];
     getHierarchySync(): ScopeNode;
     findSignalSync(fullPath: string): number;

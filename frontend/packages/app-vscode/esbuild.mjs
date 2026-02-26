@@ -53,7 +53,7 @@ const webviewConfig = {
 
 /** @type {esbuild.BuildOptions} */
 const workerConfig = {
-    entryPoints: [path.join(__dirname, '..', 'core', 'src', 'worker', 'vcdWorker.ts')],
+    entryPoints: [path.join(__dirname, '..', 'core', 'src', 'worker', 'waveformWorker.ts')],
     bundle: true,
     outfile: path.join(__dirname, 'dist', 'worker.js'),
     format: 'iife',

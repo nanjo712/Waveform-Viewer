@@ -5,7 +5,7 @@
  * the state shape, action types, and a pure reducer function.
  * React-specific wiring (Context, Provider, hooks) lives in @waveform-viewer/react-ui.
  */
-import type { SignalDef, ScopeNode, VcdMetadata, QueryResult } from '../types/vcd.ts';
+import type { SignalDef, ScopeNode, WaveformMetadata, QueryResult } from '../types/waveform.ts';
 import type { FormatPlugin } from '../types/plugin.ts';
 export interface AppState {
     /** WASM module loading status */
@@ -14,7 +14,7 @@ export interface AppState {
     /** Parsed VCD file data */
     fileLoaded: boolean;
     fileName: string | null;
-    metadata: VcdMetadata | null;
+    metadata: WaveformMetadata | null;
     signals: SignalDef[];
     hierarchy: ScopeNode | null;
     /** Selected signal indices to display in the waveform view */
@@ -50,7 +50,7 @@ export type Action = {
     error: string;
 } | {
     type: 'FILE_LOADED';
-    metadata: VcdMetadata;
+    metadata: WaveformMetadata;
     signals: SignalDef[];
     hierarchy: ScopeNode;
     fileName: string;

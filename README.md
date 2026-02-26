@@ -2,7 +2,7 @@
 
 **English** | [中文](README_ZH.md)
 
-Waveform Viewer is a high-performance web-based waveform viewer. The core parser is written in C++ and runs in the browser via WebAssembly.
+Waveform Viewer is a high-performance web-based waveform viewer for VCD and FST files. The core parser is written in C++ and runs in the browser via WebAssembly.
 
 ## Usage
 

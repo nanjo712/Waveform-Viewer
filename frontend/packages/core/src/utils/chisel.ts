@@ -1,4 +1,4 @@
-import type { ScopeNode, SignalDef } from '../types/vcd.ts';
+import type { ScopeNode, SignalDef } from '../types/waveform.ts';
 
 /**
  * Checks if a signal name matches Chisel/FIRRTL compiler-generated temporary patterns.

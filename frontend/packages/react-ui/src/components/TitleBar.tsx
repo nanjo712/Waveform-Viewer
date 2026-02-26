@@ -2,18 +2,18 @@ import { useCallback, useState } from 'react';
 import { useAppContext } from '../hooks/useAppContext.tsx';
 
 export function TitleBar() {
-    const { state, dispatch, vcdService, adapter } = useAppContext();
+    const { state, dispatch, waveformService, adapter } = useAppContext();
     const [loading, setLoading] = useState(false);
 
     const handleFileSelect = useCallback(
         async (file: import('@waveform-viewer/core').PlatformFile) => {
             setLoading(true);
             try {
-                const ok = await vcdService.indexFile(file);
+                const ok = await waveformService.indexFile(file);
                 if (ok) {
-                    const metadata = await vcdService.getMetadata();
-                    const signals = await vcdService.getSignals();
-                    const hierarchy = await vcdService.getHierarchy();
+                    const metadata = await waveformService.getMetadata();
+                    const signals = await waveformService.getSignals();
+                    const hierarchy = await waveformService.getHierarchy();
                     dispatch({
                         type: 'FILE_LOADED',
                         metadata,
@@ -22,7 +22,7 @@ export function TitleBar() {
                         fileName: file.name,
                     });
                 } else {
-                    alert('Failed to parse VCD file');
+                    alert('Failed to parse waveform file');
                 }
             } catch (err) {
                 alert(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -30,18 +30,18 @@ export function TitleBar() {
                 setLoading(false);
             }
         },
-        [dispatch, vcdService]
+        [dispatch, waveformService]
     );
 
     const handleOpen = useCallback(async () => {
-        const file = await adapter.pickFile({ extensions: ['.vcd'] });
+        const file = await adapter.pickFile({ extensions: ['.vcd', '.fst'] });
         if (file) handleFileSelect(file);
     }, [adapter, handleFileSelect]);
 
     const handleClose = useCallback(() => {
-        vcdService.close();
+        waveformService.close();
         dispatch({ type: 'FILE_CLOSED' });
-    }, [dispatch, vcdService]);
+    }, [dispatch, waveformService]);
 
     const handleOpenPlugin = useCallback(async () => {
         if (!adapter.loadPlugin) {
@@ -85,7 +85,7 @@ export function TitleBar() {
                     onClick={handleOpen}
                     disabled={state.wasmStatus !== 'ready' || loading}
                 >
-                    Open VCD
+                    Open Waveform File
                 </button>
                 {state.fileLoaded && (
                     <button className="btn" onClick={handleClose}>

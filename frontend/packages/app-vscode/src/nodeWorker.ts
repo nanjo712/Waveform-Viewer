@@ -1,12 +1,12 @@
 import { parentPort } from 'worker_threads';
-import { VcdEngine } from '../../core/src/wasm/vcdEngine.ts';
+import { WaveformEngine } from '../../core/src/wasm/waveformEngine.ts';
 import type { MainToWorkerMessage, WorkerToMainMessage } from '../../core/src/worker/protocol.ts';
-import type { QueryResult } from '../../core/src/types/vcd.ts';
+import type { QueryResult } from '../../core/src/types/waveform.ts';
 import * as path from 'path';
 
 if (!parentPort) throw new Error('Must run as a worker thread');
 
-let engine: VcdEngine | null = null;
+let engine: WaveformEngine | null = null;
 let abortController: AbortController | null = null;
 
 parentPort.on('message', async (msg: MainToWorkerMessage) => {
@@ -25,7 +25,7 @@ parentPort.on('message', async (msg: MainToWorkerMessage) => {
                         }
                     });
 
-                    engine = new VcdEngine(mod);
+                    engine = new WaveformEngine(mod);
                     parentPort!.postMessage({ type: 'INIT_DONE', success: true } as WorkerToMainMessage);
                 } catch (err: any) {
                     parentPort!.postMessage({ type: 'INIT_DONE', success: false, error: err.message } as WorkerToMainMessage);

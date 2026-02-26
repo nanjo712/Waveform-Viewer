@@ -8,14 +8,14 @@
  * Plugin loading: picks a .js file and dynamically imports it via blob URL.
  */
 
-import type { PlatformAdapter, PlatformFile, VcdParserModule } from '@waveform-viewer/core';
+import type { PlatformAdapter, PlatformFile, WaveformParserModule } from '@waveform-viewer/core';
 
-type CreateVcdParser = () => Promise<VcdParserModule>;
+type CreateWaveformParser = () => Promise<WaveformParserModule>;
 
 declare global {
     // The Emscripten-generated UMD script sets this on the global scope.
     // eslint-disable-next-line no-var
-    var createVcdParser: CreateVcdParser | undefined;
+    var createWaveformParser: CreateWaveformParser | undefined;
 }
 
 /** Wrap a browser File object into a PlatformFile handle. */
@@ -67,16 +67,16 @@ function showFilePicker(accept: string): Promise<File | null> {
     });
 }
 
-import VcdWorker from '@waveform-viewer/core/worker?worker';
+import WaveformWorker from '@waveform-viewer/core/worker?worker';
 
 // Singleton promise for WASM module (loaded once)
-let modulePromise: Promise<VcdParserModule> | null = null;
+let modulePromise: Promise<WaveformParserModule> | null = null;
 
 export class WebPlatformAdapter implements PlatformAdapter {
     readonly platformName = 'web' as const;
 
     createWorker(): Worker {
-        return new VcdWorker();
+        return new WaveformWorker();
     }
 
     getWasmConfig(): { jsUri: string; binaryUri?: string } {
@@ -89,14 +89,14 @@ export class WebPlatformAdapter implements PlatformAdapter {
         };
     }
 
-    async loadWasmModule(): Promise<VcdParserModule> {
+    async loadWasmModule(): Promise<WaveformParserModule> {
         if (!modulePromise) {
             modulePromise = (async () => {
                 const config = this.getWasmConfig();
                 await loadScript(config.jsUri);
-                const createFn = globalThis.createVcdParser;
+                const createFn = globalThis.createWaveformParser;
                 if (!createFn) {
-                    throw new Error('createVcdParser not found on globalThis after loading script');
+                    throw new Error('createWaveformParser not found on globalThis after loading script');
                 }
                 return await createFn();
             })();

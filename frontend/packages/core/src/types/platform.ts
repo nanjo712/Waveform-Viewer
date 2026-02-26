@@ -1,4 +1,4 @@
-import type { VcdParserModule } from './vcd.ts';
+import type { WaveformParserModule } from './waveform.ts';
 
 /**
  * Abstract file handle for chunk-based reading.
@@ -34,7 +34,7 @@ export interface PlatformAdapter {
     getWasmConfig(): { jsUri: string; binaryUri?: string };
 
     /** Load the WASM module and return the Emscripten module instance (deprecated in favor of worker). */
-    loadWasmModule(): Promise<VcdParserModule>;
+    loadWasmModule(): Promise<WaveformParserModule>;
 
     /**
      * Open a file picker dialog and return a PlatformFile handle.

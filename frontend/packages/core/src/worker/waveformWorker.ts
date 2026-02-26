@@ -1,13 +1,13 @@
 /// <reference lib="webworker" />
 
-import type { VcdParserModule } from '../types/vcd.ts';
+import type { WaveformParserModule } from '../types/waveform.ts';
 import type { PlatformFile } from '../types/platform.ts';
-import { VcdEngine } from '../wasm/vcdEngine.ts';
+import { WaveformEngine } from '../wasm/waveformEngine.ts';
 import type { MainToWorkerMessage, WorkerToMainMessage } from './protocol.ts';
 
 declare const self: DedicatedWorkerGlobalScope;
 
-let engine: VcdEngine | null = null;
+let engine: WaveformEngine | null = null;
 let abortController: AbortController | null = null;
 
 self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
@@ -52,8 +52,8 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
                         }
                     } : undefined;
 
-                    const mod = await createFn(opts);
-                    engine = new VcdEngine(mod);
+                    const mod = await createFn(opts) as WaveformParserModule;
+                    engine = new WaveformEngine(mod);
 
                     self.postMessage({ type: 'INIT_DONE', success: true } as WorkerToMainMessage);
                 } catch (err: any) {

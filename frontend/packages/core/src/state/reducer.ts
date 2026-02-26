@@ -9,9 +9,9 @@
 import type {
     SignalDef,
     ScopeNode,
-    VcdMetadata,
+    WaveformMetadata,
     QueryResult,
-} from '../types/vcd.ts';
+} from '../types/waveform.ts';
 import type { FormatPlugin } from '../types/plugin.ts';
 import { coreRadixPlugin } from '../plugins/coreRadixPlugin.ts';
 import { coreFloatPlugin } from '../plugins/coreFloatPlugin.ts';
@@ -26,7 +26,7 @@ export interface AppState {
     /** Parsed VCD file data */
     fileLoaded: boolean;
     fileName: string | null;
-    metadata: VcdMetadata | null;
+    metadata: WaveformMetadata | null;
     signals: SignalDef[];
     hierarchy: ScopeNode | null;
 
@@ -96,7 +96,7 @@ export type Action =
     | { type: 'WASM_ERROR'; error: string }
     | {
         type: 'FILE_LOADED';
-        metadata: VcdMetadata;
+        metadata: WaveformMetadata;
         signals: SignalDef[];
         hierarchy: ScopeNode;
         fileName: string;

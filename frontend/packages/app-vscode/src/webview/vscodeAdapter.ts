@@ -15,7 +15,7 @@
 import type {
     PlatformAdapter,
     PlatformFile,
-    VcdParserModule,
+    WaveformParserModule,
 } from '@waveform-viewer/core';
 import type {
     HostToWebviewMessage,
@@ -32,12 +32,12 @@ const vscode = (globalThis as any).acquireVsCodeApi?.() as {
     setState(state: any): void;
 } | undefined;
 
-type CreateVcdParser = (opts?: { locateFile?: (path: string) => string }) => Promise<VcdParserModule>;
+type CreateWaveformParser = (opts?: { locateFile?: (path: string) => string }) => Promise<WaveformParserModule>;
 
 declare global {
     // The Emscripten-generated script sets this on the global scope.
     // eslint-disable-next-line no-var
-    var createVcdParser: CreateVcdParser | undefined;
+    var createWaveformParser: CreateWaveformParser | undefined;
 }
 
 // ── VSCode PlatformFile implementation (stubbed) ───────────────────
@@ -83,7 +83,7 @@ window.addEventListener('message', (event: MessageEvent<HostToWebviewMessage>) =
 
 // ── Adapter ────────────────────────────────────────────────────────
 
-let modulePromise: Promise<VcdParserModule> | null = null;
+let modulePromise: Promise<WaveformParserModule> | null = null;
 let wasmConfig: { jsUri: string; binaryUri: string; workerUri: string } | null = null;
 
 /** Called when the extension host sends the init message with WASM and Worker URIs */
@@ -146,7 +146,7 @@ export class VscodePlatformAdapter implements PlatformAdapter {
         };
     }
 
-    async loadWasmModule(): Promise<VcdParserModule> {
+    async loadWasmModule(): Promise<WaveformParserModule> {
         // Deprecated: the WASM module is now loaded inside the Web Worker
         throw new Error('loadWasmModule is deprecated. Use a Web Worker instead.');
     }

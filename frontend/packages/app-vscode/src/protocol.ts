@@ -6,7 +6,7 @@
 import type {
     SignalDef,
     ScopeNode,
-    VcdMetadata,
+    WaveformMetadata,
 } from '@waveform-viewer/core';
 
 // ── Host → Webview messages ────────────────────────────────────────
@@ -16,6 +16,7 @@ export type HostToWebviewMessage =
     | { type: 'fileOpened'; fileName: string; fileSize: number }
     | { type: 'signalAdd'; indices: number[] }
     | { type: 'signalRemove'; indices: number[] }
+    | { type: 'signalToggle'; index: number }
     | { type: 'setSearch'; query: string }
     | { type: 'toggleChisel' }
     | { type: 'workerMessage'; data: any };
@@ -34,7 +35,7 @@ export type WebviewToHostMessage =
 export interface WebviewStateSnapshot {
     fileLoaded: boolean;
     fileName: string | null;
-    metadata: VcdMetadata | null;
+    metadata: WaveformMetadata | null;
     signals: SignalDef[];
     hierarchy: ScopeNode | null;
     selectedSignals: number[];

@@ -1,7 +1,7 @@
 {
     "name": "@waveform-viewer/app-vscode",
     "displayName": "Waveform Viewer",
-    "description": "View VCD waveform files natively in VSCode",
+    "description": "View VCD and FST waveform files natively in VSCode",
     "icon": "media/icon.png",
     "version": "0.3.2",
     "private": false,
@@ -22,11 +22,14 @@
     "contributes": {
         "customEditors": [
             {
-                "viewType": "waveformViewer.vcdEditor",
+                "viewType": "waveformViewer.waveformEditor",
                 "displayName": "Waveform Viewer",
                 "selector": [
                     {
                         "filenamePattern": "*.vcd"
+                    },
+                    {
+                        "filenamePattern": "*.fst"
                     }
                 ],
                 "priority": "default"

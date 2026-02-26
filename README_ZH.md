@@ -2,7 +2,7 @@
 
 [English](README.md) | **中文**
 
-Waveform Viewer 是一个高性能的 Web 波形查看器，核心解析器采用 C++ 编写并通过 WebAssembly 技术在浏览器中运行。
+Waveform Viewer 是一个支持 VCD 和 FST 格式的高性能 Web 波形查看器，核心解析器采用 C++ 编写并通过 WebAssembly 技术在浏览器中运行。
 
 ## 使用方式
 

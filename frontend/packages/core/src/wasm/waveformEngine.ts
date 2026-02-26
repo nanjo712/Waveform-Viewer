@@ -6,13 +6,14 @@
 
 import type {
     VcdParser,
-    VcdParserModule,
-    VcdMetadata,
+    FstParser,
+    WaveformParserModule,
+    WaveformMetadata,
     SignalDef,
     ScopeNode,
     QueryResult,
     SignalQueryResult,
-} from '../types/vcd.ts';
+} from '../types/waveform.ts';
 
 const INDEX_CHUNK_SIZE = 32 * 1024 * 1024;
 const QUERY_CHUNK_SIZE = 32 * 1024 * 1024;
@@ -22,11 +23,12 @@ const SIZEOF_TRANSITION_MULTIBIT = 24;
 
 const VALUE_MAP = ['0', '1', 'x', 'z'] as const;
 
-export class VcdEngine {
-    private parser: VcdParser | null = null;
-    public module: VcdParserModule;
+export class WaveformEngine {
+    private parser: VcdParser | FstParser | null = null;
+    public module: WaveformParserModule;
+    private fileExtension: string = '';
 
-    constructor(module: VcdParserModule) {
+    constructor(module: WaveformParserModule) {
         this.module = module;
     }
 
@@ -44,33 +46,45 @@ export class VcdEngine {
         onProgress?: (bytesRead: number, totalBytes: number) => void
     ): Promise<boolean> {
         this.close();
-        this.parser = new this.module.VcdParser();
 
-        if (!this.parser.open_file(filePath)) {
+        this.fileExtension = filePath.split('.').pop()?.toLowerCase() || '';
+
+        if (this.fileExtension === 'fst') {
+            this.parser = new this.module.FstParser();
+        } else {
+            this.parser = new this.module.VcdParser();
+        }
+
+        if (!this.parser!.open_file(filePath)) {
             this.close();
             return false;
         }
 
-        this.parser.begin_indexing();
+        this.parser!.begin_indexing();
 
         let offset = 0;
 
         while (offset < fileSize) {
-            const bytesRead = this.parser.index_step(INDEX_CHUNK_SIZE);
+            const bytesRead = this.parser!.index_step(INDEX_CHUNK_SIZE);
             if (bytesRead === 0) break; // EOF or error
 
             offset += bytesRead;
+            // Since FST parsing is an all-at-once blocking call right now inside WASM,
+            // we will simulate progress if it immediately returns 0 bytes.
             onProgress?.(offset, fileSize);
 
             // Yield to event loop to allow messages (like ABORT) to process
             await new Promise(resolve => setTimeout(resolve, 0));
         }
 
-        this.parser.finish_indexing();
-        if (!this.parser.isOpen()) {
+        this.parser!.finish_indexing();
+        if (!this.parser!.isOpen()) {
             this.close();
             return false;
         }
+
+        // Just ensure progress is 100%
+        onProgress?.(fileSize, fileSize);
 
         return true;
     }
@@ -160,7 +174,7 @@ export class VcdEngine {
         return rollingResult;
     }
 
-    getMetadata(): VcdMetadata {
+    getMetadata(): WaveformMetadata {
         this.assertOpen();
         const p = this.parser!;
         return {
@@ -201,7 +215,7 @@ export class VcdEngine {
 
     private decodeBinaryResult(
         raw: { ptr1Bit: number; count1Bit: number; ptrMulti: number; countMulti: number; ptrStringPool: number; countStringPool: number },
-        mod: VcdParserModule,
+        mod: WaveformParserModule,
         tBegin: number,
         tEnd: number,
         signalIndices: number[]
@@ -278,7 +292,7 @@ export class VcdEngine {
 
     private assertOpen(): void {
         if (!this.parser || !this.parser.isOpen()) {
-            throw new Error('No VCD file is currently loaded');
+            throw new Error('No VCD/FST file is currently loaded');
         }
     }
 }

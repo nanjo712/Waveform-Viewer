@@ -1,9 +1,9 @@
-export type { SignalDef, ScopeNode, TransitionEntry, SignalQueryResult, QueryResult, QueryPlan, QueryResultBinaryRaw, VcdParser, VcdParserModule, VcdMetadata, } from './types/vcd.ts';
+export type { SignalDef, ScopeNode, TransitionEntry, SignalQueryResult, QueryResult, QueryPlan, QueryResultBinaryRaw, VcdParser, FstParser, WaveformParserModule, WaveformMetadata, } from './types/waveform.ts';
 export type { FormatView, FormatPlugin, } from './types/plugin.ts';
 export type { PlatformAdapter, PlatformFile, } from './types/platform.ts';
 export { appReducer, initialState, } from './state/reducer.ts';
 export type { AppState, Action, } from './state/reducer.ts';
-export { VcdServiceClient as VcdService } from './wasm/vcdServiceClient.ts';
+export { WaveformServiceClient as WaveformService } from './wasm/waveformServiceClient.ts';
 export { coreRadixPlugin } from './plugins/coreRadixPlugin.ts';
 export { coreFloatPlugin } from './plugins/coreFloatPlugin.ts';
 export { unflattenChisel, buildSignalDisplayMap, getAllSignalsInScope, } from './utils/chisel.ts';
