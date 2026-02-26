@@ -222,7 +222,6 @@ body,
     flex-direction: column;
     overflow: hidden;
     flex-shrink: 0;
-    transition: width 0.15s ease;
 }
 
 .sidebar.collapsed {

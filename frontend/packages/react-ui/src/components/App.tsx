@@ -1,18 +1,17 @@
-import { useState, useCallback, useEffect, useRef, type DragEvent } from 'react';
+import { useState, useCallback, type DragEvent } from 'react';
 import { TitleBar } from './TitleBar.tsx';
-import { Sidebar } from './Sidebar.tsx';
-import { WaveformCanvas } from './WaveformCanvas.tsx';
 import { StatusBar } from './StatusBar.tsx';
+import { MainLayout } from './MainLayout.tsx';
 import { useAppContext } from '../hooks/useAppContext.tsx';
 
+/**
+ * App — top-level application component for the web/Tauri versions.
+ * Handles global drag-and-drop file loading and high-level layout composition.
+ */
 function App() {
     const { state, dispatch, waveformService, adapter } = useAppContext();
     const [isDragging, setIsDragging] = useState(false);
     const [isLoadingFile, setIsLoadingFile] = useState(false);
-    const [sidebarWidth, setSidebarWidth] = useState(300);
-    const [isResizing, setIsResizing] = useState(false);
-    const layoutRef = useRef<HTMLDivElement>(null);
-    const resizeRef = useRef<{ currentWidth: number; raf: number }>({ currentWidth: 300, raf: 0 });
 
     const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -71,46 +70,6 @@ function App() {
         }
     }, [dispatch, waveformService, adapter]);
 
-    const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-        setIsResizing(true);
-        resizeRef.current.currentWidth = sidebarWidth;
-        e.preventDefault();
-    }, [sidebarWidth]);
-
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (!isResizing || !layoutRef.current) return;
-
-            // Limit sidebar width between 150 and 800
-            const newWidth = Math.max(150, Math.min(800, e.clientX));
-            resizeRef.current.currentWidth = newWidth;
-
-            // Use requestAnimationFrame for smooth DOM updates without React re-renders
-            if (resizeRef.current.raf) cancelAnimationFrame(resizeRef.current.raf);
-            resizeRef.current.raf = requestAnimationFrame(() => {
-                if (layoutRef.current) {
-                    layoutRef.current.style.setProperty('--sidebar-width', `${newWidth}px`);
-                }
-            });
-        };
-
-        const handleMouseUp = () => {
-            if (!isResizing) return;
-            setIsResizing(false);
-            setSidebarWidth(resizeRef.current.currentWidth);
-        };
-
-        if (isResizing) {
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseup', handleMouseUp);
-        }
-        return () => {
-            window.removeEventListener('mousemove', handleMouseMove);
-            window.removeEventListener('mouseup', handleMouseUp);
-            if (resizeRef.current.raf) cancelAnimationFrame(resizeRef.current.raf);
-        };
-    }, [isResizing]);
-
     if (state.wasmStatus === 'loading') {
         return (
             <div className="app-layout">
@@ -131,9 +90,6 @@ function App() {
                     <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
                         {state.wasmError}
                     </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                        Make sure the WASM files are built and available at /wasm/
-                    </div>
                 </div>
             </div>
         );
@@ -141,12 +97,10 @@ function App() {
 
     return (
         <div
-            ref={layoutRef}
             className="app-layout"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}
         >
             {isDragging && (
                 <div className="drag-overlay">
@@ -163,14 +117,7 @@ function App() {
                 </div>
             )}
             <TitleBar />
-            <div className="main-content">
-                <Sidebar width={sidebarWidth} />
-                <div
-                    className={`resize-handle ${isResizing ? 'active' : ''}`}
-                    onMouseDown={handleResizeMouseDown}
-                />
-                <WaveformCanvas />
-            </div>
+            <MainLayout />
             <StatusBar />
         </div>
     );
