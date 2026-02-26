@@ -2,7 +2,7 @@
     "name": "@waveform-viewer/react-ui",
     "private": true,
     "license": "MIT",
-    "version": "0.3.5",
+    "version": "0.3.6",
     "type": "module",
     "main": "./src/index.ts",
     "types": "./src/index.ts",

@@ -3,7 +3,7 @@
     "displayName": "Waveform Viewer",
     "description": "View VCD and FST waveform files natively in VSCode",
     "icon": "media/icon.png",
-    "version": "0.3.5",
+    "version": "0.3.6",
     "private": false,
     "publisher": "woshiren",
     "license": "MIT",
