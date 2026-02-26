@@ -105,7 +105,7 @@ if(EMSCRIPTEN)
     target_include_directories(vcd_parser PUBLIC include)
     target_link_libraries(vcd_parser PRIVATE nlohmann_json::nlohmann_json fst)
 
-    target_compile_options(fst_wasm PRIVATE
+    target_compile_options(vcd_parser PRIVATE
         -sUSE_ZLIB=1
         -sUSE_BZIP2=1
     )
