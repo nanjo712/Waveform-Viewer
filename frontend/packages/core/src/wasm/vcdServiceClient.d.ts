@@ -13,6 +13,7 @@ export declare class VcdServiceClient {
     private _isFileLoaded;
     private queryCache;
     private readonly MAX_CACHE_SIZE;
+    private initPromise;
     private initResolve;
     private initReject;
     private indexResolve;

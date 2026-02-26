@@ -18,6 +18,7 @@ export declare function useAppContext(): AppContextValue;
 export interface AppProviderProps {
     adapter: PlatformAdapter;
     vcdService: VcdService;
+    autoInitWasm?: boolean;
     children: ReactNode;
 }
-export declare function AppProvider({ adapter, vcdService, children }: AppProviderProps): import("react/jsx-runtime").JSX.Element;
+export declare function AppProvider({ adapter, vcdService, autoInitWasm, children }: AppProviderProps): import("react/jsx-runtime").JSX.Element;

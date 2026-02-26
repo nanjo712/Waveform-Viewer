@@ -4,10 +4,10 @@
     "version": "0.3.1",
     "identifier": "com.waveform.viewer",
     "build": {
-        "frontendDist": "../frontend/packages/app-tauri/dist",
+        "frontendDist": "../dist",
         "devUrl": "http://localhost:1420",
-        "beforeDevCommand": "cd ../frontend && npm run dev:tauri",
-        "beforeBuildCommand": "cd ../frontend && npm run build:tauri"
+        "beforeDevCommand": "npm run dev",
+        "beforeBuildCommand": "npm run build"
     },
     "app": {
         "windows": [

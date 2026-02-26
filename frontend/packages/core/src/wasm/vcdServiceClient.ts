@@ -25,6 +25,8 @@ export class VcdServiceClient {
     private queryCache = new Map<string, QueryResult>();
     private readonly MAX_CACHE_SIZE = 10;
 
+    private initPromise: Promise<void> | null = null;
+
     // Callbacks for one-off requests
     private initResolve: ((value: void) => void) | null = null;
     private initReject: ((error: Error) => void) | null = null;
@@ -46,13 +48,13 @@ export class VcdServiceClient {
     }
 
     async init(): Promise<void> {
-        if (this.worker) return;
+        if (this.initPromise) return this.initPromise;
 
-        this.worker = this.adapter.createWorker();
-        this.worker.onmessage = this.handleWorkerMessage.bind(this);
-        this.worker.onerror = (e) => console.error('Worker error:', e);
+        this.initPromise = new Promise((resolve, reject) => {
+            this.worker = this.adapter.createWorker();
+            this.worker.onmessage = this.handleWorkerMessage.bind(this);
+            this.worker.onerror = (e) => console.error('Worker error:', e);
 
-        return new Promise((resolve, reject) => {
             this.initResolve = resolve;
             this.initReject = reject;
 
@@ -63,6 +65,8 @@ export class VcdServiceClient {
                 wasmBinaryUri: config.binaryUri
             } as MainToWorkerMessage);
         });
+
+        return this.initPromise;
     }
 
     get isReady(): boolean {

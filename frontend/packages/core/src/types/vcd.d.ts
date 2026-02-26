@@ -65,13 +65,14 @@ export interface VcdParser {
     close(): void;
     isOpen(): boolean;
     delete(): void;
-    allocate_chunk_buffer(size: number): number;
+    open_file(filepath: string): boolean;
+    close_file(): void;
     begin_indexing(): void;
-    push_chunk_for_index(size: number, global_file_offset: number): boolean;
+    index_step(chunk_size: number): number;
     finish_indexing(): void;
     get_query_plan(start_time: number): QueryPlan;
     begin_query(start_time: number, end_time: number, indicesJSON: string, snapshot_index: number, pixel_time_step: number): void;
-    push_chunk_for_query(size: number): boolean;
+    query_step(chunk_size: number): boolean;
     cancel_query(): void;
     flush_query_binary(): QueryResultBinaryRaw;
     getDate(): string;
@@ -91,6 +92,8 @@ export interface VcdParserModule {
     VcdParser: new () => VcdParser;
     /** WASM linear memory (for reading binary query results) */
     HEAPU8: Uint8Array;
+    /** Emscripten File System API */
+    FS: any;
 }
 export interface VcdMetadata {
     date: string;

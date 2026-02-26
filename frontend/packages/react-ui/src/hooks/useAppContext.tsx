@@ -52,10 +52,11 @@ export function useAppContext(): AppContextValue {
 export interface AppProviderProps {
     adapter: PlatformAdapter;
     vcdService: VcdService;
+    autoInitWasm?: boolean;
     children: ReactNode;
 }
 
-export function AppProvider({ adapter, vcdService, children }: AppProviderProps) {
+export function AppProvider({ adapter, vcdService, autoInitWasm = false, children }: AppProviderProps) {
     const [state, dispatch] = useReducer(appReducer, initialState);
 
     // Bind window.WaveformViewer globally so plugins can register themselves
@@ -73,6 +74,8 @@ export function AppProvider({ adapter, vcdService, children }: AppProviderProps)
 
     // Initialize WASM on mount
     useEffect(() => {
+        if (!autoInitWasm) return;
+
         vcdService
             .init()
             .then(() => dispatch({ type: 'WASM_READY' }))
@@ -82,7 +85,7 @@ export function AppProvider({ adapter, vcdService, children }: AppProviderProps)
                     error: err instanceof Error ? err.message : String(err),
                 })
             );
-    }, [vcdService]);
+    }, [vcdService, autoInitWasm]);
 
     // ── Query Optimization State ───────────────────────────────────────────
     const currentDataRangeRef = useRef<{ start: number, end: number, signals: string } | null>(null);

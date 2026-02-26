@@ -42,7 +42,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: |
-            src-tauri -> target
+            frontend/packages/app-tauri/src-tauri -> target
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -69,6 +69,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          projectPath: './frontend/packages/app-tauri'
           tagName: ${{ github.ref_name }}
           releaseName: 'Waveform Viewer ${{ github.ref_name }}'
           releaseBody: 'See the assets to download this version.'
@@ -81,9 +82,8 @@ jobs:
         shell: bash
         run: |
           # The binary name might be 'app.exe' or 'waveform-viewer.exe' 
-          # depending on how Tauri/Cargo handled the productName.
           # We search for it in the release folder.
-          find src-tauri/target/release -maxdepth 1 -name "*.exe" -not -name "*.d" -exec cp {} ./waveform-viewer-portable.exe \;
+          find frontend/packages/app-tauri/src-tauri/target/release -maxdepth 1 -name "*.exe" -not -name "*.d" -exec cp {} ./waveform-viewer-portable.exe \;
 
       - name: Upload portable binary (Windows)
         if: matrix.platform == 'windows-latest'

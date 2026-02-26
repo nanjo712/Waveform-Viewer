@@ -10,7 +10,7 @@ const vcdService = new VcdService(adapter);
 
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
-        <AppProvider adapter={adapter} vcdService={vcdService}>
+        <AppProvider adapter={adapter} vcdService={vcdService} autoInitWasm={true}>
             <App />
         </AppProvider>
     </StrictMode>,

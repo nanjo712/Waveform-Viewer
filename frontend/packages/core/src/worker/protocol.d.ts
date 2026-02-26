@@ -5,6 +5,8 @@ export type MainToWorkerMessage = {
     wasmBinaryUri?: string;
 } | {
     type: 'INDEX_FILE';
+    file?: File;
+    localPath?: string;
     fileSize: number;
 } | {
     type: 'QUERY';

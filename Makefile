@@ -35,12 +35,12 @@ release:
 	@sed -i '0,/"version": "[^"]*"/s//"version": "$(V)"/' frontend/package.json
 	@find frontend/packages -name package.json -maxdepth 2 -exec sed -i '0,/"version": "[^"]*"/s//"version": "$(V)"/' {} +
 	@# Update Tauri configuration
-	@sed -i '0,/"version": "[^"]*"/s//"version": "$(V)"/' src-tauri/tauri.conf.json
-	@sed -i '0,/^version = "[^"]*"/s//version = "$(V)"/' src-tauri/Cargo.toml
+	@sed -i '0,/"version": "[^"]*"/s//"version": "$(V)"/' frontend/packages/app-tauri/src-tauri/tauri.conf.json
+	@sed -i '0,/^version = "[^"]*"/s//version = "$(V)"/' frontend/packages/app-tauri/src-tauri/Cargo.toml
 	@# Sync lock files
 	@echo ">>> Updating lock files..."
 	@cd $(FRONTEND) && npm install
-	@cd src-tauri && cargo fetch
+	@cd frontend/packages/app-tauri/src-tauri && cargo fetch
 	@# Git operations
 	@echo ">>> Committing and tagging..."
 	@git add .
@@ -99,8 +99,7 @@ web: $(FRONTEND)/node_modules wasm
 
 tauri: $(FRONTEND)/node_modules wasm
 	@echo ">>> Building Tauri application..."
-	@$(FE_RUN) && npm run build:tauri
-	@cd $(FRONTEND)/packages/app-tauri && npx @tauri-apps/cli build
+	@cd frontend/packages/app-tauri && npx @tauri-apps/cli build
 
 dev: $(FRONTEND)/node_modules wasm
 	@echo ">>> Starting Dev Server..."
