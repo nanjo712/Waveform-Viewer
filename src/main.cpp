@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "fstapi.h"
 #include "vcd_parser.h"
 
 static const char* time_unit_str(vcd::TimeUnit u)
@@ -64,6 +65,32 @@ int main(int argc, char* argv[])
     }
 
     const char* filepath = argv[1];
+    std::string path_str(filepath);
+    if (path_str.size() > 4 && path_str.substr(path_str.size() - 4) == ".fst")
+    {
+        std::printf("Opening FST file: %s\n", filepath);
+        fstReaderContext* ctx = fstReaderOpen(filepath);
+        if (!ctx)
+        {
+            std::fprintf(stderr, "Failed to open FST file: %s\n", filepath);
+            return 1;
+        }
+
+        std::printf("\n=== FST File Info ===\n");
+        std::printf("Date:             %s\n", fstReaderGetDateString(ctx));
+        std::printf("Version:          %s\n", fstReaderGetVersionString(ctx));
+        std::printf("Timescale:        1e%d s\n",
+                    (int)fstReaderGetTimescale(ctx));
+        std::printf("Time range:       [%lu, %lu]\n",
+                    (unsigned long)fstReaderGetStartTime(ctx),
+                    (unsigned long)fstReaderGetEndTime(ctx));
+        std::printf("Variable count:   %lu\n",
+                    (unsigned long)fstReaderGetVarCount(ctx));
+
+        fstReaderClose(ctx);
+        return 0;
+    }
+
     uint64_t chunk_size_bytes = 32 * 1024 * 1024;  // 32 MB default
     if (argc >= 3)
     {

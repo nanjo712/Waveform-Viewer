@@ -16,3 +16,5 @@ frontend/packages/**/media/wasm/vcd_parser.js
 frontend/packages/**/media/wasm/vcd_parser.wasm
 *.vsix
 *.fst
+compile_commands.json
+
