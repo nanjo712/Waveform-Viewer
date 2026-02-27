@@ -1,32 +1,33 @@
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "waveform_parser.h"
+
+// Forward declaration of fstReaderContext
+struct fstReaderContext;
 
 namespace vcd
 {
-    // ============================================================================
-    // VcdParser - main interface
-    // ============================================================================
-
-    class VcdParser : public IWaveformParser
+    class FstParser : public IWaveformParser
     {
        public:
-        VcdParser();
-        ~VcdParser() override;
+        FstParser();
+        ~FstParser() override;
 
         // Non-copyable
-        VcdParser(const VcdParser&) = delete;
-        VcdParser& operator=(const VcdParser&) = delete;
+        FstParser(const FstParser&) = delete;
+        FstParser& operator=(const FstParser&) = delete;
 
         // Move
-        VcdParser(VcdParser&&) noexcept;
-        VcdParser& operator=(VcdParser&&) noexcept;
+        FstParser(FstParser&&) noexcept;
+        FstParser& operator=(FstParser&&) noexcept;
 
-        /// Whether a file is currently parsed (header complete)
         bool is_open() const override;
 
         // --- Metadata accessors ---
-
         const Timescale& timescale() const override;
         uint64_t time_begin() const override;
         uint64_t time_end() const override;
@@ -34,65 +35,36 @@ namespace vcd
         const std::string& date() const override;
         const std::string& version() const override;
 
-        /// Get all signal definitions.
         const std::vector<SignalDef>& signals() const override;
-
-        /// Get the root scope node.
         const ScopeNode* root_scope() const override;
-
-        /// Find a signal by its full hierarchical path (e.g. "top.cpu.clk").
         const SignalDef* find_signal(
             const std::string& full_path) const override;
 
-        /// Find signal index by id code.
-        /// Returns UINT32_MAX if not found.
-        uint32_t find_signal_by_id(const std::string& id_code) const;
-
         // --- Indexing Phase ---
-
-        /// Open a VCD file using standard fopen
         bool open_file(const std::string& filepath) override;
-
-        /// Close the currently opened file
         void close_file() override;
-
-        /// Start indexing phase. Resets all internal state.
         void begin_indexing() override;
-
-        /// Repeatedly call to read and process chunks of the file.
-        /// @return Number of bytes read in this step (0 means EOF or error)
         size_t index_step(size_t chunk_size) override;
-
-        /// Finalize indexing. Creates a final snapshot if needed.
         void finish_indexing() override;
 
         // --- Query Phase ---
-
-        /// Binary-search the snapshot list to find the best starting point
         QueryPlan get_query_plan(uint64_t start_time) const override;
 
-        /// Prepare a query for signals in [start_time, end_time].
         void begin_query(uint64_t start_time, uint64_t end_time,
                          const std::vector<uint32_t>& signal_indices,
                          size_t snapshot_index,
                          float pixel_time_step = -1.0f) override;
 
-        /// Step-based query execution for non-blocking iteration.
         bool query_step(size_t chunk_size) override;
-
-        /// Extract the query results accumulated so far.
         QueryResultBinary flush_query_binary() override;
+        void cancel_query() override;
 
         // --- Statistics ---
         size_t snapshot_count() const override;
         size_t index_memory_usage() const override;
 
-        /// Cancel an ongoing query
-        void cancel_query() override;
-
        private:
         struct Impl;
         std::unique_ptr<Impl> impl_;
     };
-
 }  // namespace vcd

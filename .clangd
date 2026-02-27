@@ -4,7 +4,7 @@ CompileFlags:
         "-target", "wasm32-unknown-emscripten",
         "--sysroot=/home/woshiren/emsdk/upstream/emscripten/cache/sysroot"
     ]
-    Remove: [-fmodules-ts, -fmodule-mapper=*, -fdeps-format=*]
+    Remove: [-fmodules-ts, -fmodule-mapper=*, -fdeps-format=*, -sUSE_ZLIB=1,-sUSE_BZIP2=1]
 
 Index:
     Background: Build

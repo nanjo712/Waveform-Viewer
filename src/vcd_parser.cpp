@@ -282,7 +282,8 @@ namespace vcd
                     if (current_time - last_emitted_time[idx] <
                         static_cast<uint64_t>(pixel_time_step))
                     {
-                        // Multiple transitions within one pixelTimeStep detected
+                        // Multiple transitions within one pixelTimeStep
+                        // detected
                         if (!signal_is_glitch[idx])
                         {
                             // Mark the previous transition as GLITCH
@@ -291,7 +292,8 @@ namespace vcd
                                 int64_t last_idx = last_index_1bit[idx];
                                 if (last_idx >= 0)
                                 {
-                                    query_res_1bit[last_idx].value = 4; // GLITCH
+                                    query_res_1bit[last_idx].value =
+                                        4;  // GLITCH
                                 }
                             }
                             else if (sig.width > 1)
@@ -299,29 +301,37 @@ namespace vcd
                                 int64_t last_idx = last_index_multi[idx];
                                 if (last_idx >= 0)
                                 {
-                                    // Use a special convention for multi-bit glitch if needed,
-                                    // but for Multi-bit, we can just use the string "GLITCH"
-                                    // or mark it via a special field.
-                                    // For now, let's stick to the user's idea of a "state".
-                                    // We'll append "GLITCH" to the string pool for this transition.
-                                    uint32_t offset = static_cast<uint32_t>(query_string_pool.size());
+                                    // Use a special convention for multi-bit
+                                    // glitch if needed, but for Multi-bit, we
+                                    // can just use the string "GLITCH" or mark
+                                    // it via a special field. For now, let's
+                                    // stick to the user's idea of a "state".
+                                    // We'll append "GLITCH" to the string pool
+                                    // for this transition.
+                                    uint32_t offset = static_cast<uint32_t>(
+                                        query_string_pool.size());
                                     const std::string g_str = "GLITCH";
                                     query_string_pool.append(g_str);
-                                    query_res_multibit[last_idx].string_offset = offset;
-                                    query_res_multibit[last_idx].string_length = static_cast<uint32_t>(g_str.size());
+                                    query_res_multibit[last_idx].string_offset =
+                                        offset;
+                                    query_res_multibit[last_idx].string_length =
+                                        static_cast<uint32_t>(g_str.size());
                                 }
                             }
                             signal_is_glitch[idx] = true;
                         }
 
-                        // Still need to update current internal state for consistency
+                        // Still need to update current internal state for
+                        // consistency
                         if (sig.width == 1 && is_1bit)
                         {
-                            set_1bit_state(current_state_1bit, sig.bit_index, char_to_val2b(val_tok[0]));
+                            set_1bit_state(current_state_1bit, sig.bit_index,
+                                           char_to_val2b(val_tok[0]));
                         }
                         else if (sig.width > 1)
                         {
-                            current_state_multibit[sig.str_index] = std::string(val_tok);
+                            current_state_multibit[sig.str_index] =
+                                std::string(val_tok);
                         }
                         continue;
                     }
@@ -334,8 +344,10 @@ namespace vcd
 
                     if (emit && is_queried)
                     {
-                        last_index_1bit[idx] = static_cast<int64_t>(query_res_1bit.size());
-                        query_res_1bit.push_back({current_time, idx, v, {0, 0, 0}});
+                        last_index_1bit[idx] =
+                            static_cast<int64_t>(query_res_1bit.size());
+                        query_res_1bit.push_back(
+                            {current_time, idx, v, {0, 0, 0}});
                         if (pixel_time_step > 0.0f)
                         {
                             last_emitted_time[idx] = current_time;
@@ -345,14 +357,19 @@ namespace vcd
                 }
                 else if (sig.width > 1)
                 {
-                    current_state_multibit[sig.str_index] = std::string(val_tok);
+                    current_state_multibit[sig.str_index] =
+                        std::string(val_tok);
 
                     if (emit && is_queried)
                     {
-                        uint32_t offset = static_cast<uint32_t>(query_string_pool.size());
+                        uint32_t offset =
+                            static_cast<uint32_t>(query_string_pool.size());
                         query_string_pool.append(val_tok);
-                        last_index_multi[idx] = static_cast<int64_t>(query_res_multibit.size());
-                        query_res_multibit.push_back({current_time, idx, offset, static_cast<uint32_t>(val_tok.size()), 0});
+                        last_index_multi[idx] =
+                            static_cast<int64_t>(query_res_multibit.size());
+                        query_res_multibit.push_back(
+                            {current_time, idx, offset,
+                             static_cast<uint32_t>(val_tok.size()), 0});
                         if (pixel_time_step > 0.0f)
                         {
                             last_emitted_time[idx] = current_time;
@@ -920,7 +937,7 @@ namespace vcd
         impl_->leftover_file_offset = 0;
         impl_->query_cancel_flag.store(false);
         impl_->pixel_time_step = pixel_step;
-        
+
         size_t n_sigs = impl_->signal_defs.size();
         impl_->last_emitted_time.assign(n_sigs, 0);
         impl_->last_index_1bit.assign(n_sigs, -1);
@@ -1011,7 +1028,8 @@ namespace vcd
             {
                 for (uint32_t idx : impl_->query_signal_indices)
                 {
-                    if (idx < impl_->last_emitted_time.size()) {
+                    if (idx < impl_->last_emitted_time.size())
+                    {
                         impl_->last_emitted_time[idx] = impl_->query_t_begin;
                     }
                 }

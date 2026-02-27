@@ -100,6 +100,7 @@ if(EMSCRIPTEN)
     # =========================================================================
     add_executable(vcd_parser
         src/vcd_parser.cpp
+        src/fst_parser.cpp
         src/wasm_bindings.cpp
     )
     target_include_directories(vcd_parser PUBLIC include)
@@ -141,7 +142,6 @@ if(EMSCRIPTEN)
     )
 
     target_compile_options(fst PRIVATE -s USE_ZLIB=1)
-    target_compile_options(vcd_parser PRIVATE -s USE_ZLIB=1)
 else()
     # =========================================================================
     # Native build: static library + CLI viewer
@@ -149,9 +149,10 @@ else()
     message(STATUS "Configuring for native build")
     add_library(vcd_parser STATIC
         src/vcd_parser.cpp
+        src/fst_parser.cpp
     )
     target_include_directories(vcd_parser PUBLIC include)
-    target_link_libraries(vcd_parser PRIVATE nlohmann_json::nlohmann_json)
+    target_link_libraries(vcd_parser PRIVATE nlohmann_json::nlohmann_json fst)
 
     add_executable(vcd_viewer src/main.cpp)
     target_link_libraries(vcd_viewer PRIVATE vcd_parser fst)
