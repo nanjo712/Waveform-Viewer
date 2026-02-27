@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "fstapi.h"
+#include "lod_manager.h"
 
 namespace vcd
 {
@@ -15,15 +16,17 @@ namespace vcd
         std::unordered_map<std::string, uint32_t> sig_map;
         std::unordered_map<fstHandle, uint32_t> handle_to_sig;
 
+        std::vector<uint8_t> current_state_1bit;
+        std::vector<std::string> current_state_multi;
+
         std::vector<Transition1Bit> res_1bit;
         std::vector<TransitionMultiBit> res_multi;
-        std::vector<char> string_pool;
+        std::string string_pool;
 
-        float pixel_time_step = -1.0f;
-        std::vector<uint64_t> last_emitted_time;
+        LodManager lod_manager;
         std::vector<int64_t> last_index_1bit;
         std::vector<int64_t> last_index_multi;
-        std::vector<bool> signal_is_glitch;
+
         uint64_t query_t_begin = 0;
         uint64_t query_t_end = 0;
         bool query_done = false;
@@ -59,44 +62,6 @@ namespace vcd
             auto it = handle_to_sig.find(facidx);
             if (it == handle_to_sig.end()) return;
             uint32_t sig_idx = it->second;
-
-            if (pixel_time_step > 0.0f &&
-                last_emitted_time[sig_idx] != 0xFFFFFFFFFFFFFFFFULL)
-            {
-                if ((time - last_emitted_time[sig_idx]) <
-                    static_cast<uint64_t>(pixel_time_step))
-                {
-                    if (!signal_is_glitch[sig_idx])
-                    {
-                        const SignalDef& s = signals[sig_idx];
-                        if (s.width == 1)
-                        {
-                            int64_t last_idx = last_index_1bit[sig_idx];
-                            if (last_idx >= 0)
-                                res_1bit[last_idx].value = 4;  // GLITCH
-                        }
-                        else
-                        {
-                            int64_t last_idx = last_index_multi[sig_idx];
-                            if (last_idx >= 0)
-                            {
-                                uint32_t offset =
-                                    static_cast<uint32_t>(string_pool.size());
-                                const std::string g_str = "GLITCH";
-                                string_pool.insert(string_pool.end(),
-                                                   g_str.begin(), g_str.end());
-                                res_multi[last_idx].string_offset = offset;
-                                res_multi[last_idx].string_length =
-                                    static_cast<uint32_t>(g_str.size());
-                            }
-                        }
-                        signal_is_glitch[sig_idx] = true;
-                    }
-                    return;
-                }
-            }
-
-            last_emitted_time[sig_idx] = time;
             const SignalDef& sig = signals[sig_idx];
 
             if (len == 0)
@@ -105,44 +70,43 @@ namespace vcd
 
             if (sig.width == 1)
             {
-                Transition1Bit t;
-                t.timestamp = time;
-                t.signal_index = sig_idx;
-                uint8_t v = value[0];
-                if (v == '0')
-                    t.value = 0;
-                else if (v == '1')
-                    t.value = 1;
-                else if (v == 'x' || v == 'X')
-                    t.value = 2;
-                else if (v == 'z' || v == 'Z')
-                    t.value = 3;
+                uint8_t v;
+                uint8_t val_char = value[0];
+                if (val_char == '0')
+                    v = 0;
+                else if (val_char == '1')
+                    v = 1;
+                else if (val_char == 'x' || val_char == 'X')
+                    v = 2;
+                else if (val_char == 'z' || val_char == 'Z')
+                    v = 3;
                 else
-                    t.value = 0;
+                    v = 0;
 
-                last_index_1bit[sig_idx] =
-                    static_cast<int64_t>(res_1bit.size());
-                res_1bit.push_back(t);
+                uint8_t old_v = current_state_1bit[sig_idx];
+                lod_manager.process_1bit(time, sig_idx, v, old_v, res_1bit,
+                                         last_index_1bit);
+                current_state_1bit[sig_idx] = v;
             }
             else
             {
-                TransitionMultiBit t;
-                t.timestamp = time;
-                t.signal_index = sig_idx;
-                t.string_offset = static_cast<uint32_t>(string_pool.size());
-
+                std::string val_tok;
                 if (value[0] == 'b' || value[0] == 'B')
                 {
-                    value++;
-                    len--;
+                    val_tok = std::string(
+                        reinterpret_cast<const char*>(value + 1), len - 1);
                 }
-                t.string_length = len;
-                string_pool.insert(string_pool.end(), value, value + len);
-                last_index_multi[sig_idx] =
-                    static_cast<int64_t>(res_multi.size());
-                res_multi.push_back(t);
+                else
+                {
+                    val_tok =
+                        std::string(reinterpret_cast<const char*>(value), len);
+                }
+
+                lod_manager.process_multibit(
+                    time, sig_idx, val_tok, current_state_multi[sig_idx],
+                    res_multi, last_index_multi, string_pool);
+                current_state_multi[sig_idx] = val_tok;
             }
-            signal_is_glitch[sig_idx] = false;
         }
     };
 
@@ -344,7 +308,6 @@ namespace vcd
                                 size_t snapshot_index, float pixel_time_step)
     {
         if (!impl_->ctx) return;
-        impl_->pixel_time_step = pixel_time_step;
         impl_->query_t_begin = start_time;
         impl_->query_t_end = end_time;
 
@@ -352,10 +315,11 @@ namespace vcd
         fstReaderClrFacProcessMaskAll(impl_->ctx);
 
         size_t n_sigs = impl_->signals.size();
-        impl_->last_emitted_time.assign(n_sigs, 0xFFFFFFFFFFFFFFFFULL);
+        impl_->lod_manager.reset(n_sigs, pixel_time_step);
         impl_->last_index_1bit.assign(n_sigs, -1);
         impl_->last_index_multi.assign(n_sigs, -1);
-        impl_->signal_is_glitch.assign(n_sigs, false);
+        impl_->current_state_1bit.assign(n_sigs, 2);  // default 'x'
+        impl_->current_state_multi.assign(n_sigs, "x");
 
         impl_->res_1bit.clear();
         impl_->res_multi.clear();
@@ -374,9 +338,24 @@ namespace vcd
                 char* v = fstReaderGetValueFromHandleAtTime(
                     impl_->ctx, start_time, handle, val_buf.data());
                 if (v)
-                    impl_->handle_value(
-                        start_time, handle,
-                        reinterpret_cast<const unsigned char*>(v), width);
+                {
+                    std::string_view val_sv(v);
+                    if (width == 1)
+                    {
+                        uint8_t val = (v[0] == '1') ? 1 : (v[0] == '0' ? 0 : 2);
+                        impl_->lod_manager.emit_initial_1bit(
+                            start_time, idx, val, impl_->res_1bit,
+                            impl_->last_index_1bit);
+                        impl_->current_state_1bit[idx] = val;
+                    }
+                    else
+                    {
+                        impl_->lod_manager.emit_initial_multibit(
+                            start_time, idx, val_sv, impl_->res_multi,
+                            impl_->last_index_multi, impl_->string_pool);
+                        impl_->current_state_multi[idx] = std::string(val_sv);
+                    }
+                }
             }
         }
     }

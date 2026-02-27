@@ -101,6 +101,7 @@ if(EMSCRIPTEN)
     add_executable(vcd_parser
         src/vcd_parser.cpp
         src/fst_parser.cpp
+        src/lod_manager.cpp
         src/wasm_bindings.cpp
     )
     target_include_directories(vcd_parser PUBLIC include)
@@ -150,6 +151,7 @@ else()
     add_library(vcd_parser STATIC
         src/vcd_parser.cpp
         src/fst_parser.cpp
+        src/lod_manager.cpp
     )
     target_include_directories(vcd_parser PUBLIC include)
     target_link_libraries(vcd_parser PRIVATE nlohmann_json::nlohmann_json fst)
