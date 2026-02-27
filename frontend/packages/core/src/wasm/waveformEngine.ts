@@ -280,6 +280,7 @@ export class WaveformEngine {
             );
             const valStr = textDecoder.decode(strBytes);
 
+
             if (timestamp <= tBegin) {
                 entry.initialValue = valStr;
                 entry.transitions = [];

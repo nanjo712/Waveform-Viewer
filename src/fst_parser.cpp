@@ -371,6 +371,11 @@ namespace vcd
 
     QueryResultBinary FstParser::flush_query_binary()
     {
+        // Flush any open glitches at the end of the query range
+        impl_->lod_manager.flush_glitches(
+            impl_->res_1bit, impl_->last_index_1bit, impl_->res_multi,
+            impl_->last_index_multi, impl_->string_pool);
+
         QueryResultBinary res;
         res.transitions_1bit = impl_->res_1bit.data();
         res.count_1bit = impl_->res_1bit.size();

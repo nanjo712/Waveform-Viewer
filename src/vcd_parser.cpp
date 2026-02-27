@@ -292,20 +292,26 @@ namespace vcd
                 }
                 else if (sig.width > 1)
                 {
+                    // Strip 'b'/'B' prefix for consistency with FST parser
+                    std::string_view multi_val = val_tok;
+                    if (!multi_val.empty() &&
+                        (multi_val[0] == 'b' || multi_val[0] == 'B'))
+                        multi_val.remove_prefix(1);
+
                     const std::string& old_v =
                         current_state_multibit[sig.str_index];
 
                     if (emit && is_queried)
                     {
-                        lod_manager.process_multibit(current_time, idx, val_tok,
-                                                     old_v, query_res_multibit,
-                                                     last_index_multi,
-                                                     query_string_pool);
+                        lod_manager.process_multibit(
+                            current_time, idx, multi_val, old_v,
+                            query_res_multibit, last_index_multi,
+                            query_string_pool);
                     }
 
                     // Always update internal state
                     current_state_multibit[sig.str_index] =
-                        std::string(val_tok);
+                        std::string(multi_val);
                 }
             }
         }
@@ -946,6 +952,12 @@ namespace vcd
             impl_->emit_query_initial_state();
             impl_->query_initial_emitted = true;
         }
+
+        // Flush any open glitches at the end of the query range
+        impl_->lod_manager.flush_glitches(
+            impl_->query_res_1bit, impl_->last_index_1bit,
+            impl_->query_res_multibit, impl_->last_index_multi,
+            impl_->query_string_pool);
 
         impl_->binary_result.transitions_1bit =
             impl_->query_res_1bit.empty() ? nullptr
