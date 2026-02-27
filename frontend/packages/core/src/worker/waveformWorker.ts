@@ -143,7 +143,6 @@ self.onmessage = async (e: MessageEvent<MainToWorkerMessage>) => {
                 break;
             }
 
-            // READ_SLICE_RESPONSE removed
 
             case 'GET_METADATA': {
                 if (!engine) return;

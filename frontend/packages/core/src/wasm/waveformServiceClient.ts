@@ -186,9 +186,6 @@ export class WaveformServiceClient {
         return this._cachedSignals.findIndex(s => s.fullPath === fullPath);
     }
 
-    // Alias getters for existing code calling getMetadata() synchronously
-    // We will update the react-ui later if needed, but for now we'll overwrite the methods
-    // once file is indexed to be synchronous.
 
     close(): void {
         this._isFileLoaded = false;
@@ -278,7 +275,6 @@ export class WaveformServiceClient {
                 }
                 break;
 
-            // READ_SLICE_REQUEST handler removed
 
             case 'METADATA_RESULT':
             case 'SIGNALS_RESULT':

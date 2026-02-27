@@ -575,11 +575,6 @@ export function WaveformCanvas() {
                 p.closePath();
             }
 
-            // Text rendering (only if wide enough)
-            const segWidth = t - f;
-            if (segWidth > 40) {
-                // We'll do a second pass for text to avoid switching state too much
-            }
         };
 
 
