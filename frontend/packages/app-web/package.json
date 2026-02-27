@@ -2,7 +2,7 @@
     "name": "@waveform-viewer/app-web",
     "private": true,
     "license": "MIT",
-    "version": "0.3.9",
+    "version": "0.3.10",
     "type": "module",
     "scripts": {
         "dev": "vite",
