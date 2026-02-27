@@ -101,6 +101,10 @@ function parseBase(val: string, width: number) {
     let raw = val;
     if (raw.startsWith('b') || raw.startsWith('B')) raw = raw.slice(1);
 
+    if (raw === 'GLITCH') {
+        return { isX: false, isZ: false, paddedBin: raw };
+    }
+
     const isX = raw.includes('x') || raw.includes('X');
     const isZ = raw.includes('z') || raw.includes('Z');
 
