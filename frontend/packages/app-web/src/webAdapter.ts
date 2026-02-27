@@ -10,13 +10,6 @@
 
 import type { PlatformAdapter, PlatformFile, WaveformParserModule } from '@waveform-viewer/core';
 
-type CreateWaveformParser = () => Promise<WaveformParserModule>;
-
-declare global {
-    // The Emscripten-generated UMD script sets this on the global scope.
-    // eslint-disable-next-line no-var
-    var createWaveformParser: CreateWaveformParser | undefined;
-}
 
 /** Wrap a browser File object into a PlatformFile handle. */
 function wrapBrowserFile(file: File): PlatformFile {
@@ -31,16 +24,6 @@ function wrapBrowserFile(file: File): PlatformFile {
     };
 }
 
-/** Load a JS script by injecting a <script> tag into document.head. */
-function loadScript(src: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-        document.head.appendChild(script);
-    });
-}
 
 /** Show a native file picker and return the selected File, or null if cancelled. */
 function showFilePicker(accept: string): Promise<File | null> {
@@ -69,8 +52,6 @@ function showFilePicker(accept: string): Promise<File | null> {
 
 import WaveformWorker from '@waveform-viewer/core/worker?worker';
 
-// Singleton promise for WASM module (loaded once)
-let modulePromise: Promise<WaveformParserModule> | null = null;
 
 export class WebPlatformAdapter implements PlatformAdapter {
     readonly platformName = 'web' as const;
@@ -89,20 +70,6 @@ export class WebPlatformAdapter implements PlatformAdapter {
         };
     }
 
-    async loadWasmModule(): Promise<WaveformParserModule> {
-        if (!modulePromise) {
-            modulePromise = (async () => {
-                const config = this.getWasmConfig();
-                await loadScript(config.jsUri);
-                const createFn = globalThis.createWaveformParser;
-                if (!createFn) {
-                    throw new Error('createWaveformParser not found on globalThis after loading script');
-                }
-                return await createFn();
-            })();
-        }
-        return modulePromise;
-    }
 
     async pickFile(options?: { extensions?: string[] }): Promise<PlatformFile | null> {
         const accept = options?.extensions?.join(',') ?? '.vcd';

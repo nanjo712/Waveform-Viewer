@@ -7,7 +7,7 @@ import {
 } from 'react';
 import { useAppContext } from '../hooks/useAppContext.tsx';
 import { unflattenChisel, buildSignalDisplayMap } from '@waveform-viewer/core';
-import type { SignalQueryResult, SignalDisplayInfo } from '@waveform-viewer/core';
+import type { SignalQueryResult, SignalDisplayInfo, FormatPlugin, FormatView } from '@waveform-viewer/core';
 
 
 // ── Color palette for signals ──────────────────────────────────────
@@ -960,13 +960,13 @@ export function WaveformCanvas() {
                             onChange={(e) => dispatch({ type: 'SET_SIGNAL_FORMAT', index: state.activeSignalIndex!, format: e.target.value })}
                             title="Format"
                         >
-                            {state.formatPlugins.map(plugin => {
+                            {state.formatPlugins.map((plugin: FormatPlugin) => {
                                 const activeSig = state.signals[state.activeSignalIndex!];
-                                const validViews = plugin.views.filter(v => v.supportedWidths === 'any' || v.supportedWidths.includes(activeSig.width));
+                                const validViews = plugin.views.filter((v: FormatView) => v.supportedWidths === 'any' || v.supportedWidths.includes(activeSig.width));
                                 if (validViews.length === 0) return null;
                                 return (
                                     <optgroup key={plugin.id} label={plugin.name}>
-                                        {validViews.map(v => (
+                                        {validViews.map((v: FormatView) => (
                                             <option key={v.id} value={v.id}>{v.name}</option>
                                         ))}
                                     </optgroup>

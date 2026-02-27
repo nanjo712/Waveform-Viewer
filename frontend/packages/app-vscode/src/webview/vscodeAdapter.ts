@@ -32,13 +32,6 @@ const vscode = (globalThis as any).acquireVsCodeApi?.() as {
     setState(state: any): void;
 } | undefined;
 
-type CreateWaveformParser = (opts?: { locateFile?: (path: string) => string }) => Promise<WaveformParserModule>;
-
-declare global {
-    // The Emscripten-generated script sets this on the global scope.
-    // eslint-disable-next-line no-var
-    var createWaveformParser: CreateWaveformParser | undefined;
-}
 
 // ── VSCode PlatformFile implementation (stubbed) ───────────────────
 
@@ -83,7 +76,6 @@ window.addEventListener('message', (event: MessageEvent<HostToWebviewMessage>) =
 
 // ── Adapter ────────────────────────────────────────────────────────
 
-let modulePromise: Promise<WaveformParserModule> | null = null;
 let wasmConfig: { jsUri: string; binaryUri: string; workerUri: string } | null = null;
 
 /** Called when the extension host sends the init message with WASM and Worker URIs */
@@ -146,10 +138,6 @@ export class VscodePlatformAdapter implements PlatformAdapter {
         };
     }
 
-    async loadWasmModule(): Promise<WaveformParserModule> {
-        // Deprecated: the WASM module is now loaded inside the Web Worker
-        throw new Error('loadWasmModule is deprecated. Use a Web Worker instead.');
-    }
 
     async pickFile(): Promise<PlatformFile | null> {
         // Not applicable — VSCode handles file opening via custom editor
@@ -162,14 +150,3 @@ export class VscodePlatformAdapter implements PlatformAdapter {
     }
 }
 
-// ── Helper: load a script by injecting a <script> tag ──────────────
-
-function loadScript(src: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = src;
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-        document.head.appendChild(script);
-    });
-}

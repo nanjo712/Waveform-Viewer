@@ -33,9 +33,6 @@ export interface PlatformAdapter {
     /** Get the URIs needed by the worker to load WASM. */
     getWasmConfig(): { jsUri: string; binaryUri?: string };
 
-    /** Load the WASM module and return the Emscripten module instance (deprecated in favor of worker). */
-    loadWasmModule(): Promise<WaveformParserModule>;
-
     /**
      * Open a file picker dialog and return a PlatformFile handle.
      * Returns null if the user cancels the dialog.
