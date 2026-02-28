@@ -2,7 +2,7 @@
     "name": "waveform-viewer-frontend",
     "private": true,
     "license": "MIT",
-    "version": "0.3.10",
+    "version": "0.3.11",
     "type": "module",
     "workspaces": [
         "packages/core",
