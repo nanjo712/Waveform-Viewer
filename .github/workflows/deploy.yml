@@ -39,3 +39,12 @@ jobs:
         with:
           folder: dist
           branch: gh-pages
+      
+      - name: Publish to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: 'waveform-viewer' # 这里必须和 CF 上的项目名完全一致
+          directory: 'dist' # 你的构建产物目录
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
