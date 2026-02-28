@@ -45,5 +45,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: deploy dist --name=wave
+          command: pages deploy dist --project-name=waveform-viewer
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
