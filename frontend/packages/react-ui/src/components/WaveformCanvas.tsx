@@ -850,10 +850,10 @@ export function WaveformCanvas() {
                 <div className="empty-state">
                     <div className="empty-state-icon">&#9776;</div>
                     <div className="empty-state-text">
-                        Open a VCD file to view waveforms
+                        Open a waveform file to view waveforms
                     </div>
                     <div className="empty-state-hint">
-                        Click "Open VCD" in the title bar
+                        Click "Open Waveform File" in the title bar
                     </div>
                 </div>
             </div>

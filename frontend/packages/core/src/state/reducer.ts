@@ -71,6 +71,9 @@ export interface AppState {
 
     /** LOD Aggregation Factor: 1.0 = 1 pixel, 5.0 = 5 pixels */
     lodPixelFactor: number;
+
+    /** File loading/indexing status */
+    fileLoading: boolean;
 }
 
 export const initialState: AppState = {
@@ -96,6 +99,7 @@ export const initialState: AppState = {
     activeSignalIndex: null,
     queryCounter: 0,
     lodPixelFactor: 1.0,
+    fileLoading: false,
 };
 
 // ── Actions ────────────────────────────────────────────────────────────
@@ -127,7 +131,8 @@ export type Action =
     | { type: 'REGISTER_PLUGIN'; plugin: FormatPlugin }
     | { type: 'SET_ACTIVE_SIGNAL'; index: number | null }
     | { type: 'FORCE_REFRESH' }
-    | { type: 'SET_LOD_FACTOR'; factor: number };
+    | { type: 'SET_LOD_FACTOR'; factor: number }
+    | { type: 'SET_FILE_LOADING'; loading: boolean };
 
 // ── Reducer ────────────────────────────────────────────────────────────
 
@@ -169,6 +174,7 @@ export function appReducer(state: AppState, action: Action): AppState {
                 timeBegin: tBegin,
                 timeEnd: tEnd,
                 queryResult: null,
+                fileLoading: false,
             };
         }
 
@@ -177,7 +183,11 @@ export function appReducer(state: AppState, action: Action): AppState {
                 ...initialState,
                 wasmStatus: state.wasmStatus,
                 wasmError: state.wasmError,
+                fileLoading: false,
             };
+
+        case 'SET_FILE_LOADING':
+            return { ...state, fileLoading: action.loading };
 
         case 'TOGGLE_SIGNAL': {
             const idx = action.index;

@@ -11,7 +11,6 @@ import { useAppContext } from '../hooks/useAppContext.tsx';
 function App() {
     const { state, dispatch, waveformService, adapter } = useAppContext();
     const [isDragging, setIsDragging] = useState(false);
-    const [isLoadingFile, setIsLoadingFile] = useState(false);
 
     const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -34,8 +33,9 @@ function App() {
         const nativeFile = e.dataTransfer.files?.[0];
         if (!nativeFile) return;
 
-        if (!nativeFile.name.toLowerCase().endsWith('.vcd')) {
-            alert('Please drop a .vcd file');
+        const nameLower = nativeFile.name.toLowerCase();
+        if (!nameLower.endsWith('.vcd') && !nameLower.endsWith('.fst')) {
+            alert('Please drop a .vcd or .fst file');
             return;
         }
 
@@ -46,7 +46,7 @@ function App() {
             return;
         }
 
-        setIsLoadingFile(true);
+        dispatch({ type: 'SET_FILE_LOADING', loading: true });
         try {
             const ok = await waveformService.indexFile(file);
             if (ok) {
@@ -61,12 +61,12 @@ function App() {
                     fileName: file.name,
                 });
             } else {
-                alert('Failed to parse VCD file');
+                alert('Failed to parse Waveform file');
             }
         } catch (err) {
             alert(`Error: ${err instanceof Error ? err.message : String(err)}`);
         } finally {
-            setIsLoadingFile(false);
+            dispatch({ type: 'SET_FILE_LOADING', loading: false });
         }
     }, [dispatch, waveformService, adapter]);
 
@@ -106,14 +106,14 @@ function App() {
                 <div className="drag-overlay">
                     <div className="drag-overlay-content">
                         <div style={{ fontSize: '64px', marginBottom: '16px' }}>&#128193;</div>
-                        <h2>Drop VCD File Here</h2>
+                        <h2>Drop Waveform File Here</h2>
                     </div>
                 </div>
             )}
-            {isLoadingFile && (
+            {state.fileLoading && (
                 <div className="loading-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(30, 30, 30, 0.85)', zIndex: 9999 }}>
                     <div className="spinner" />
-                    <div>Indexing VCD file...</div>
+                    <div>Indexing waveform file...</div>
                 </div>
             )}
             <TitleBar />

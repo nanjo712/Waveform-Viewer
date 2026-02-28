@@ -384,7 +384,7 @@ const SidebarContent = memo(({
                 <div className="empty-state">
                     <div className="empty-state-text">No file loaded</div>
                     <div className="empty-state-hint">
-                        Open a VCD file to browse signals
+                        Open a waveform file to browse signals
                     </div>
                 </div>
             )}

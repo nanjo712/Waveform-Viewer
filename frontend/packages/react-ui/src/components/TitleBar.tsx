@@ -1,13 +1,12 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useAppContext } from '../hooks/useAppContext.tsx';
 
 export function TitleBar() {
     const { state, dispatch, waveformService, adapter } = useAppContext();
-    const [loading, setLoading] = useState(false);
 
     const handleFileSelect = useCallback(
         async (file: import('@waveform-viewer/core').PlatformFile) => {
-            setLoading(true);
+            dispatch({ type: 'SET_FILE_LOADING', loading: true });
             try {
                 const ok = await waveformService.indexFile(file);
                 if (ok) {
@@ -27,7 +26,7 @@ export function TitleBar() {
             } catch (err) {
                 alert(`Error: ${err instanceof Error ? err.message : String(err)}`);
             } finally {
-                setLoading(false);
+                dispatch({ type: 'SET_FILE_LOADING', loading: false });
             }
         },
         [dispatch, waveformService]
@@ -72,7 +71,6 @@ export function TitleBar() {
                 </span>
             </div>
             <div className="titlebar-right">
-                {loading && <span style={{ color: 'var(--text-warning)' }}>Indexing...</span>}
                 <button
                     className="btn"
                     onClick={handleOpenPlugin}
@@ -83,7 +81,7 @@ export function TitleBar() {
                 <button
                     className="btn btn-primary"
                     onClick={handleOpen}
-                    disabled={state.wasmStatus !== 'ready' || loading}
+                    disabled={state.wasmStatus !== 'ready' || state.fileLoading}
                 >
                     Open Waveform File
                 </button>
