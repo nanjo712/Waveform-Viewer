@@ -40,6 +40,13 @@ jobs:
           folder: dist
           branch: gh-pages
 
+      - name: List Cloudflare Pages Projects (Diagnostic)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages project list
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
